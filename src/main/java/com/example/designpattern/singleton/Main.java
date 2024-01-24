@@ -1,6 +1,6 @@
 package com.example.designpattern.singleton;
 
-class main {
+class Main {
     public static void main(String[] args) {
         UnsafeThreadLazySingleton instance1 = UnsafeThreadLazySingleton.getInstance();
         SafeThreadLazySingleton instance2 = SafeThreadLazySingleton.getInstance();

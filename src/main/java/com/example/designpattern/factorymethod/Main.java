@@ -1,6 +1,6 @@
 package com.example.designpattern.factorymethod;
 
-class main {
+class Main {
     public static void main(String[] args) {
         // 只需要切换这一句代码，就可以把下面的car具体实例全部换了
         CarFactory carFactory = new ACarFactory();
