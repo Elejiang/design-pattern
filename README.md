@@ -753,3 +753,283 @@ class DELLComputerBuilder extends ComputerBuilder{
 - 产品类：要创建的复杂对象。（Computer）
 
 - 指挥者类：调用具体建造者来创建复杂对象的各个部分，在指导者中不涉及具体产品的信息，只负责保证对象各部分完整创建或按某种顺序创建。 （Director）
+
+## 结构型模式
+
+> 结构型模式描述如何将类或对象按某种布局组成更大的结构。它分为类结构型模式和对象结构型模式，前者采用继承机制来组织接口和类，后者釆用组合或聚合来组合对象。
+
+**说人话**其实就是***搞类与类之间关系的，以此来做大做强的***
+
+### 适配器模式
+
+> 将一个类的接口转换成客户希望的另外一个接口，使得原本由于接口不兼容而不能一起工作的那些类能一起工作。
+
+我们知道，电脑一般只能读取SD卡，要读TF卡的话需要用转换器，转换器不止能把TF卡转成SD接口，你想转成USB都行......
+
+那来吧，SDCard 和 TFCard：
+
+```Java
+interface SDCard {
+    String readSD();
+    
+    void writeSD(String msg);
+}
+
+interface TFCard {
+    String readTF();
+    
+    void writeTF(String msg);
+}
+```
+
+SDCard 和 TFCard的具体实现：
+
+```Java
+class SDCardImpl implements SDCard {
+    @Override
+    public String readSD() {
+        return "read SD card";
+    }
+    
+    @Override
+    public void writeSD(String msg) {
+        System.out.println("write SD card:" + msg);
+    }
+}
+
+class TFCardImpl implements TFCard {
+    @Override
+    public String readTF() {
+        return "read TF card";
+    }
+    
+    @Override
+    public void writeTF(String msg) {
+        System.out.println("write TF card:" + msg);
+    }
+}
+```
+
+再来个电脑，嗯......只能读取SD卡的电脑：
+
+```Java
+class Computer {
+    public String readSD(SDCard sdCard) {
+        return sdCard.readSD();
+    }
+    
+    public void writeSD(SDCard sdCard, String msg) {
+        sdCard.writeSD(msg);
+    }
+}
+```
+
+现在的需求是，我要让电脑读取TFCard，但显然TFCard是传不到电脑的两个方法里的，方法只认SDCard！我们需要一个转换器，也就是适配器，适配器的实现分为两种——类适配器模式和对象适配器模式。
+
+1. 类适配器模式
+
+   类适配器模式的实现是**实现目标接口**（SDCard），**继承原本的类**（TFCard），实现了目标接口，根据多态，电脑就”认“它，能识别它；继承原本的类，表示适配器运行的还是原本方法（TFCard里的数据）。
+
+   > 想想转换器是不是外观上像SDCard，大大的，接口也和SD卡一样（实现接口），但还是需要插入一张TFCard（继承原本的类）才有数据
+
+   ```Java
+   class AdapterTF2SD extends TFCardImpl implements SDCard{
+       @Override
+       public String readSD() {
+           return readTF();
+       }
+       
+       @Override
+       public void writeSD(String msg) {
+           writeTF(msg);
+       }
+   }
+   ```
+
+   虽然方法名是读SD卡（实现SDCard接口），但里面具体实现已经被偷梁换柱成了TFCard的读取方法（继承了TFCardImpl类），写入方法同理。
+
+   来看看客户端的调用：
+
+   ```Java
+   class Main {
+       public static void main(String[] args) {
+           Computer computer = new Computer();
+           
+           SDCardImpl sdCard = new SDCardImpl();
+           // SD卡正常读写没问题
+           System.out.println(computer.readSD(sdCard));
+           computer.writeSD(sdCard, "write to sd");
+           // 创建适配器，适配器因为继承关系其实相当于已经插入了一张TF卡
+           AdapterTF2SD adapter = new AdapterTF2SD();
+           System.out.println(computer.readSD(adapter));
+           computer.writeSD(adapter, "write to adapter");
+       }
+   }
+   ```
+
+2. 对象适配器模式
+
+   还是需要适配器去实现SDCard接口，这样才能被电脑识别，但不再继承TFCard，而是内聚一个TFCard的对象（其实这才像是往转换器里插入一张TF卡）：
+
+   ```Java
+   class AdapterTF2SD2 implements SDCard{
+       private TFCard tfCard;
+       
+       public AdapterTF2SD2(TFCard tfCard) {
+           this.tfCard = tfCard;
+       }
+       
+       @Override
+       public String readSD() {
+           return tfCard.readTF();
+       }
+       
+       @Override
+       public void writeSD(String msg) {
+           tfCard.writeTF(msg);
+       }
+   }
+   ```
+
+   同样可以把重写SDCard接口的两个方法内部具体实现偷梁换柱，换成TFCard的，来看客户端代码：
+
+   ```Java
+   class Main {
+       public static void main(String[] args) {
+           Computer computer = new Computer();
+   
+           AdapterTF2SD2 adapter2 = new AdapterTF2SD2(new TFCardImpl());
+           System.out.println(computer.readSD(adapter2));
+           computer.writeSD(adapter2, "write to adapter2");
+       }
+   }
+   ```
+
+我们再回头看适配器模式定义：
+
+> 将一个类的接口转换成客户希望的另外一个接口，使得原本由于接口不兼容而不能一起工作的那些类能一起工作。
+
+**说人话**其实就是***你的接口不接受我，那我就实现你的接口，但方法逻辑还是走我的，这下你接受不？***
+
+我们再来看适配器模式出现的角色：
+
+- 目标接口：当前系统业务所期待的接口，它可以是抽象类或接口。（SDCard）
+
+- 适配者类：它是被访问和适配的现存组件库中的组件接口。（TFCard）
+
+- 适配器类：它是一个转换器，通过继承或引用适配者的对象，把适配者接口转换成目标接口，让客户按目标接口的格式访问适配者。（AdapterTF2SD 和 AdapterTF2SD2）
+
+### 装饰者模式
+
+> 指在不改变现有对象结构的情况下，动态地给该对象增加一些职责（即增加其额外功能）的模式。
+
+现有一家快餐店，有炒面、炒饭这些快餐，同时可以额外附加鸡蛋、培根这些配菜，当然加配菜需要额外加钱，每个配菜的价钱通常不太一样，那么计算总价就会显得比较麻烦。
+
+按照传统方法，我们需要有”加鸡蛋的炒面“、”加火腿的炒面“、”加鸡蛋的炒饭“和”加火腿的炒饭“这些类。现在如果我需要新增一个炒粉主食呢，因为有两个配菜，需要增加两个类，如果又要再加火腿配菜呢，因为有三个主食了，需要增加三个类，如果一个主食可以不只放一个配菜呢，”火腿鸡蛋炒面“，”鸡蛋培根炒粉“······
+
+透过现象看本质，其实上述案例的主角是主食，配菜都是主食的一些附加功能，**加了配菜的主食仍然是主食**。既然如此，先来一个食物类：
+
+```Java
+abstract class FastFood {
+    private float price;
+    
+    private String desc;
+
+    public abstract float cost();
+}
+```
+
+为方便起见，并没有展示get和set等方法，我们只看关键代码——主食有价钱和描述两个属性，同时有个计算当前主食价格的方法，这里的cost()计算得到的价格并不一定为price，因为可能有配菜。
+
+再来个炒面类：
+
+```Java
+class FriedNoodles extends FastFood {
+    public FriedNoodles() {
+        super(12, "炒面");
+    }
+    
+    public float cost() {
+        return getPrice();
+    }
+}
+```
+
+没有附加配菜的炒面价格就是其本身，所以cost方法就是返回price。
+
+我们再来想配菜类应该怎么处理，前面我们说到**加了配菜的主食仍然是主食**，那么配菜应该是这样的：接收一个主食，并能够返回一个主食，主食还是那个主食，但已经被加了小料（被附加了功能），所以配菜也应该继承食物类：
+
+```Java
+abstract class Garnish extends FastFood {
+    private FastFood fastFood;
+    
+    public FastFood getFastFood() {
+        return fastFood;
+    }
+    
+    public Garnish(FastFood fastFood, float price, String desc) {
+        super(price,desc);
+        this.fastFood = fastFood;
+    }
+}
+```
+
+来看具体的配菜类：
+
+```Java
+class Egg extends Garnish {
+    public Egg(FastFood fastFood) {
+        super(fastFood, 1, "鸡蛋");
+    }
+    
+    @Override
+    public float cost() {
+        return getPrice() + getFastFood().getPrice();
+    }
+    
+    @Override
+    public String getDesc() {
+        return super.getDesc() + getFastFood().getDesc();
+    }
+}
+```
+
+可以看到配菜的构造方法是接收一个主食，同时重写了主食的方法，调用了自己的getPrice()，又调用了主食的getPrice()，这就是对主食的getPrice()的增强，为其附加了自己的功能(自己的getPrice())，getDesc()方法的增强同理。同时他也是继承于FastFood，本质上还是个主食，可以继续被增强。
+
+直接看客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        //点一份炒饭
+        FastFood food = new FriedNoodles();
+        //花费的价格
+        System.out.println(food.getDesc() + " " + food.cost() + "元");
+
+        //点一份加鸡蛋的炒饭
+        FastFood food1 = new FriedNoodles();
+        // 配菜接收主食，同时返回的也是主食，可以被food1重新接收，主食还是那份主食，但里面方法的功能已经被增强了
+        food1 = new Egg(food1);
+        //花费的价格
+        System.out.println(food1.getDesc() + " " + food1.cost() + "元");
+    }
+}
+```
+
+如果想要扩展主食，如炒饭，只需要增加一个炒饭类就行，要新增配菜，也只需要新增一个配菜类就行，而主食加的配菜，方法的增强都是可以灵活变通的，想加两个鸡蛋都不成问题~
+
+我们再回头看装饰者模式的定义：
+
+> 指在不改变现有对象结构的情况下，动态地给该对象增加一些职责（即增加其额外功能）的模式。
+
+**说人话**其实就是***加了配菜的炒饭还是炒饭！***
+
+我们再看装饰者模式出现的角色：
+
+- 抽象构件：定义一个抽象接口以规范准备接收附加责任的对象。（FastFood）
+
+- 具体构件 ：实现抽象构件，通过装饰角色为其添加一些职责。（FiredNoodles）
+
+- 抽象装饰 ： 继承或实现抽象构件，并包含具体构件的实例，可以通过其子类扩展具体构件的功能。（Garnish）
+
+- 具体装饰 ：实现抽象装饰的相关方法，并给具体构件对象添加附加的责任。（Egg）
