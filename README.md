@@ -1022,7 +1022,7 @@ class Main {
 
 > 指在不改变现有对象结构的情况下，动态地给该对象增加一些职责（即增加其额外功能）的模式。
 
-**说人话**其实就是***加了配菜的炒饭还是炒饭！***
+**说人话**其实就是***炒饭可以加配料，加了配料的炒饭还是炒饭！***
 
 我们再看装饰者模式出现的角色：
 
@@ -1033,3 +1033,652 @@ class Main {
 - 抽象装饰 ： 继承或实现抽象构件，并包含具体构件的实例，可以通过其子类扩展具体构件的功能。（Garnish）
 
 - 具体装饰 ：实现抽象装饰的相关方法，并给具体构件对象添加附加的责任。（Egg）
+
+### 代理模式
+
+> 一个类代表另一个类的功能
+
+代理分为静态代理和动态代理，我们先来看静态代理：
+
+1. 静态代理
+
+   现有一个卖票接口：
+
+   ```Java
+   interface SellTickets {
+       void sell();
+   }
+   ```
+
+   我们可以从火车站买票：
+
+   ```Java
+   class TrainStation implements SellTickets {
+       public void sell() {
+           System.out.println("火车站卖票");
+       }
+   }
+   ```
+
+   也可以从代售点买票：
+
+   ```Java
+   class ProxyPoint implements SellTickets {
+       private TrainStation station = new TrainStation();
+       
+       public void sell() {
+           System.out.println("代理点收取一些服务费用");
+           station.sell();
+       }
+   }
+   ```
+
+   从代理点可以对原对象（火车站）的卖票方法进行一些增强（收取一些服务费用）。
+
+   在某些情况下，我们以后买票就可以从代理对象（代理点）处买票，实行被增强的方法，代理类是提前写好的，所以叫静态代理。
+
+2. 动态代理
+
+   动态代理分为JDK代理和CGLIB代理
+
+   1. JDK代理
+
+      仍然是上述接口和火车站，我们可以通过JDK自带的Proxy类中的newProxyInstance()直接获取代理对象：
+
+      ```Java
+      class JDKProxyFactory {
+      
+          private TrainStation station = new TrainStation();
+      
+          public SellTickets getProxyObject() {
+              //使用Proxy获取代理对象
+              /*
+                  newProxyInstance()方法参数说明：
+                      ClassLoader loader ： 类加载器，用于加载代理类，使用真实对象的类加载器即可
+                      Class<?>[] interfaces ： 真实对象所实现的接口，代理模式真实对象和代理对象实现相同的接口
+                      InvocationHandler h ： 代理对象的调用处理程序
+               */
+              return (SellTickets) Proxy.newProxyInstance(
+                      station.getClass().getClassLoader(),
+                      station.getClass().getInterfaces(),
+                      new InvocationHandler() {
+                          /*
+                              InvocationHandler中invoke方法参数说明：
+                                  proxy ： 代理对象
+                                  method ： 对应于在代理对象上调用的接口方法的 Method 实例
+                                  args ： 代理对象调用接口方法时传递的实际参数
+                           */
+                          public Object invoke(Object proxy, Method method, Object[] args) throws Throwable {
+                              System.out.println("代理点收取一些服务费用(JDK动态代理方式)");
+                              //执行真实对象
+                              Object result = method.invoke(station, args);
+                              return result;
+                          }
+                      });
+          }
+      }
+      ```
+
+      JDK代理要求被代理的对象需要实现接口。
+
+   2. CGLIB代理
+
+      JDK代理需要被代理的对象实现接口，这就限制了其使用范围，CGLIB代理则不需要代理对象实现接口，但其由第三方提供，并非JDK自带
+
+      ```xml
+      <dependency>
+          <groupId>cglib</groupId>
+          <artifactId>cglib</artifactId>
+          <version>2.2.2</version>
+      </dependency>
+      ```
+
+      由代理工厂实现MethodInterceptor接口，方法的增强实现在intercept中
+
+      ```Java
+      class CGLIBProxyFactory implements MethodInterceptor {
+          private TrainStation target = new TrainStation();
+          public TrainStation getProxyObject() {
+              //创建Enhancer对象，类似于JDK动态代理的Proxy类，下一步就是设置几个参数
+              Enhancer enhancer =new Enhancer();
+              //设置父类的字节码对象
+              enhancer.setSuperclass(target.getClass());
+              //设置回调函数
+              enhancer.setCallback(this);
+              //创建代理对象
+              return (TrainStation) enhancer.create();
+          }
+      
+          /*
+              intercept方法参数说明：
+                  o ： 代理对象
+                  method ： 真实对象中的方法的Method实例
+                  args ： 实际参数
+                  methodProxy ：代理对象中的方法的method实例
+           */
+          public TrainStation intercept(Object o, Method method, Object[] args, MethodProxy methodProxy) throws Throwable {
+              System.out.println("代理点收取一些服务费用(CGLIB动态代理方式)");
+              TrainStation result = (TrainStation) methodProxy.invokeSuper(o, args);
+              return result;
+          }
+      }
+      ```
+
+客户端调用：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        // 静态代理
+        ProxyPoint pp = new ProxyPoint();
+        pp.sell();
+        // JDK动态代理
+        JDKProxyFactory jdkProxyFactory = new JDKProxyFactory();
+        SellTickets proxyObject = jdkProxyFactory.getProxyObject();
+        proxyObject.sell();
+        // CGLIB动态代理
+        CGLIBProxyFactory cglibProxyFactory = new CGLIBProxyFactory();
+        TrainStation proxyObject1 = cglibProxyFactory.getProxyObject();
+        proxyObject1.sell();
+    }
+}
+```
+
+使用CGLib实现动态代理，CGLib底层采用ASM字节码生成框架，使用字节码技术生成代理类，在JDK1.6之前比使用Java反射效率要高。唯一需要注意的是，CGLib不能对声明为final的类或者方法进行代理，因为CGLib原理是动态生成被代理类的子类。
+ 在JDK1.6、JDK1.7、JDK1.8逐步对JDK动态代理优化之后，在调用次数较少的情况下，JDK代理效率高于CGLib代理效率，只有当进行大量调用的时候，JDK1.6和JDK1.7比CGLib代理效率低一点，但是到JDK1.8的时候，JDK代理效率高于CGLib代理。所以如果有接口使用JDK动态代理，如果没有接口使用CGLIB代理。
+
+我们再回头看代理模式定义：
+
+> 一个类代表另一个类的功能
+
+**说人话**其实就是***当前类的功能我想用，但我觉得还不太行，我想对其增强，我就创个plus版本的代理类，代理类有着增强后的方法***
+
+我们再看代理模式中出现的角色：
+
+- 抽象主题类： 通过接口或抽象类声明真实主题和代理对象实现的业务方法。（SellTickets）
+
+- 真实主题类： 实现了抽象主题中的具体业务，是代理对象所代表的真实对象，是最终要引用的对象。（TrainStation）
+
+- 代理类 ： 提供了与真实主题相同的接口，其内部含有对真实主题的引用，它可以访问、控制或扩展真实主题的功能。（JDKProxyFactory和CGLIBProxyFactory中获取的代理对象）
+
+### 外观模式
+
+> 又名门面模式，是一种通过为多个复杂的子系统提供一个一致的接口，而使这些子系统更加容易被访问的模式
+
+炒股是个大学问，你可以购买多支股票，抛出多支股票，有时还想买点国债，卖点国债，玩玩房地产......如果这些子系统都需要你亲力亲为来一一操作的话，是很麻烦的，我们一般找个基金帮我们管理，可以进行一次性全部买入，一次性全部卖出等操作
+
+需要操作的子系统：
+
+```Java
+class Stock1 {
+    public void sell() {
+        System.out.println("股票1卖出");
+    }
+    public void buy() {
+        System.out.println("股票1买入");
+    }
+}
+
+class Stock2 {
+    public void sell() {
+        System.out.println("股票2卖出");
+    }
+    public void buy() {
+        System.out.println("股票2买入");
+    }
+}
+
+class Stock3 {
+    public void sell() {
+        System.out.println("股票3卖出");
+    }
+    public void buy() {
+        System.out.println("股票3买入");
+    }
+}
+
+class Realty1 {
+    public void sell() {
+        System.out.println("房地产1卖出");
+    }
+    public void buy() {
+        System.out.println("房地产1买入");
+    }
+}
+
+class NationalDebt1 {
+    public void sell() {
+        System.out.println("国债1卖出");
+    }
+    public void buy() {
+        System.out.println("国债1买入");
+    }
+}
+```
+
+基金类：
+
+```Java
+class Fund {
+    Stock1 stock1;
+    Stock2 stock2;
+    Stock3 stock3;
+    NationalDebt1 nationalDebt1;
+    Realty1 realty1;
+    
+    public Fund() {
+        stock1 = new Stock1();
+        stock2 = new Stock2();
+        stock3 = new Stock3();
+        nationalDebt1 = new NationalDebt1();
+        realty1 = new Realty1();
+    }
+    
+    public void buyFund() {
+        stock1.buy();
+        stock2.buy();
+        stock3.buy();
+        nationalDebt1.buy();
+        realty1.buy();
+    }
+    
+    public void sellFund() {
+        stock1.sell();
+        stock2.sell();
+        stock3.sell();
+        nationalDebt1.sell();
+        realty1.sell();
+    }
+}
+```
+
+可以看到，基金类可以一键帮我们操作对应的买入和卖出操作，我们只需要把东西交给基金管理即可，客户端代码也是十分简单：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Fund fund = new Fund();
+        fund.buyFund();
+        fund.sellFund();
+    }
+}
+```
+
+到这里，我们清楚了，外观模式中的外观其实就是我们和子系统之间沟通的入口，我们只能也只需要通过这个入口对子系统进行操作就行了，无需了解复杂的子系统内部结构。
+
+我们再回头看外观模式定义：
+
+> 又名门面模式，是一种通过为多个复杂的子系统提供一个一致的接口，而使这些子系统更加容易被访问的模式
+
+**说人话**其实就是***找个管家帮我管理下家中事务，有什么事我只需要跟管家沟通即可***
+
+我们再看外观模式中出现的角色：
+
+- 外观角色：为多个子系统对外提供一个共同的接口。
+
+- 子系统角色：实现系统的部分功能，客户可以通过外观角色访问它。
+
+### 桥接模式
+
+> 将抽象与实现分离，使它们可以独立变化。它是用组合关系代替继承关系来实现，从而降低了抽象和实现这两个可变维度的耦合度。
+
+现按照手机品牌划分，有OPPO，Vivo等等，每个手机发展自己的软件，软件继承于手机，分为OPPOGame，VivoGame，OppoAppStore， VivoAppStore......那么每增加一个手机，就需要对所有软件进行一个实现，每新增一个软件，就需要让所有手机实现它。
+
+如果按照手机软件划分，有Game，AppStore等等，每个软件都有不同的手机上的实现，手机实现继承于软件，分为GameOppo，GameVivo，AppStoreOppo，AppstoreVivo......嗯......和上面的问题如出一辙。
+
+造成这种现象的原因其实是软件和手机品牌是通过继承关系实现的，两者耦合程度太高，不妨试试内聚的实现，先看抽象的手机：
+
+```Java
+abstract class Phone {
+    protected Software software;
+    
+    public void setSoftware(Software software) {
+        this.software = software;
+    }
+    
+    public abstract void run();
+}
+```
+
+手机的具体实现：
+
+```Java
+class Oppo extends Phone {
+    @Override
+    public void run() {
+        System.out.print("Oppo:");
+        software.run();
+    }
+}
+
+class Vivo extends Phone {
+    @Override
+    public void run() {
+        System.out.print("Vivo:");
+        software.run();
+    }
+}
+```
+
+软件的接口：
+
+```Java
+interface Software {
+    void run();
+}
+```
+
+具体软件实现：
+
+```Java
+class AppStore implements Software {
+    @Override
+    public void run() {
+        System.out.println("Appstore run");
+    }
+}
+
+class Game implements Software {
+    @Override
+    public void run() {
+        System.out.println("game run");
+    }
+}
+```
+
+这样，我们可以往手机里传不同的软件就可以直接运行：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        AppStore appStore = new AppStore();
+        Game game = new Game();
+        Oppo oppo = new Oppo();
+        Vivo vivo = new Vivo();
+        
+        oppo.setSoftware(appStore);
+        oppo.run();
+        oppo.setSoftware(game);
+        oppo.run();
+        vivo.setSoftware(appStore);
+        vivo.run();
+        vivo.setSoftware(game);
+        vivo.run();
+    }
+}
+```
+
+继承的耦合使程序的扩展显得麻烦，那两者就通过聚合关系解除耦合，我想新增一个软件无需管手机的事，只管根据软件接口写软件运行的代码就可以了，不管是什么手机，都能根据我的那个接口运行我，而新增手机也只需要内聚一个软件对象，知道软件运行的接口就可以运行传进来的软件，代码显得十分灵活。
+
+我们再来看桥接模式的定义：
+
+>将抽象与实现分离，使它们可以独立变化。它是用组合关系代替继承关系来实现，从而降低了抽象和实现这两个可变维度的耦合度。
+
+**说人话**其实就是***两个类的”融合“不要通过继承了，这样不好扩展，用聚合+接口的形式***
+
+我们再看桥接模式出现的角色：
+
+- 抽象化：定义抽象类，并包含一个对实现化对象的引用。（Phone）
+
+- 扩展抽象化：是抽象化角色的子类，实现父类中的业务方法，并通过组合关系调用实现化角色中的业务方法。（Oppo 和 Vivo）
+
+- 实现化：定义实现化角色的接口，供扩展抽象化角色调用。（Software）
+
+- 具体实现化：给出实现化角色接口的具体实现。（Appstore 和Game）
+
+### 组合模式
+
+> 又名部分整体模式，是用于把一组相似的对象当作一个单一的对象。组合模式依据树形结构来组合对象，用来表示部分以及整体层次。这种类型的设计模式属于结构型模式，它创建了对象组的树形结构。
+
+打开你的电脑硬盘，可以看到硬盘中既有文件夹又有文件，而文件夹里既有文件夹又有文件，文件夹里既有文件夹又有文件，文件夹里既有文件夹又有文件......无限套娃了是吧，假如文件夹和文件是无关系的对象，那么对象的管理显得十分麻烦，假如我要遍历一个文件夹里的内容，我需要对当前遍历到的对象进行判断，如果是文件夹，继续深入遍历，如果是文件，则读取。
+
+那么能不能把文件夹和文件统一，抽象出一个相同的访问方法呢，组合模式来了：
+
+把文件夹和文件抽象出一个接口：
+
+```Java
+interface Component {
+    public void add(Component c);
+    public void remove(Component c);
+    public Component getChild(int i);
+    public void operation();
+}
+```
+
+文件，即叶子节点继承该接口：
+
+```Java
+class Leaf implements Component{
+    private String name;
+    
+    public Leaf(String name) {
+        this.name = name;
+    }
+    
+    @Override
+    public void add(Component c) {}
+    @Override
+    public void remove(Component c) {}
+    @Override
+    public Component getChild(int i) {
+        return null;
+    }
+    
+    @Override
+    public void operation() {
+        System.out.println("树叶"+name+"：被访问！");
+    }
+
+}
+```
+
+因为是文件，所以新增、移除和获取下一层次的child是空方法，只需要重点实现被访问时的方法operation即可，再看文件夹的实现：
+
+```Java
+class Composite implements Component {
+    private String name;
+    
+    private ArrayList<Component> children = new ArrayList<Component>();
+    
+    public Composite(String name) {
+        this.name = name;
+    }
+    
+    public void add(Component c) {
+        children.add(c);
+    }
+    
+    public void remove(Component c) {
+        children.remove(c);
+    }
+    
+    public Component getChild(int i) {
+        return children.get(i);
+    }
+    
+    public void operation() {
+        for (Component component : children) {
+            component.operation();
+        }
+    }
+}
+```
+
+因为是文件夹，可能里面还包含其它子节点，这些子节点可能是文件也可能还是文件夹，但无所谓，他们都是Component，文件夹都照收不误，而访问文件夹时，其实就是想对里面的每个Component访问，得了，遍历吧，反正不管子节点是文件夹还是文件，都是执行operation方法，多简单。
+
+来看看客户端调用：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Composite root = new Composite("根节点");
+        root.add(new Leaf("叶子节点1"));
+        root.add(new Leaf("叶子节点2"));
+        root.add(new Leaf("叶子节点3"));
+        Composite composite1 = new Composite("节点1");
+        root.add(composite1);
+        composite1.add(new Leaf("叶子节点4"));
+        composite1.add(new Leaf("叶子节点5"));
+        
+        root.operation();
+    }
+}
+```
+
+我们再回头看组合模式的定义：
+
+> 又名部分整体模式，是用于把一组相似的对象当作一个单一的对象。组合模式依据树形结构来组合对象，用来表示部分以及整体层次。这种类型的设计模式属于结构型模式，它创建了对象组的树形结构。
+
+**说人话**其实就是***不管你是文件还是文件夹，我都把你们看成一种对象处理，你们去实现相同的接口，方便我建造树形结构和遍历***
+
+我们再看组合模式中出现的角色：
+
+- 抽象根节点：定义系统各层次对象的共有方法和属性，可以预先定义一些默认行为和属性。（Component）
+
+- 树枝节点：定义树枝节点的行为，存储子节点，组合树枝节点和叶子节点形成一个树形结构。（Composite）
+
+- 叶子节点：叶子节点对象，其下再无分支，是系统层次遍历的最小单位。（Leaf）
+
+### 享元模式
+
+> 运用共享技术来有效地支持大量细粒度对象的复用。它通过共享已经存在的对象来大幅度减少需要创建的对象数量、避免大量相似对象的开销，从而提高系统资源的利用率。
+
+俄罗斯方块分为L型方块，T型方块，O型方块，I型方块等等，每个方块在一把游戏中又不止出现一次，一把游戏得创建多少个方块对象......我的老年机表示吃不消了；围棋棋盘有361个落点，一局游戏算上被提走的子，又要创建多少个棋子对象，围棋在线对局又同时进行着多少场对局......服务器表示吃不消了
+
+上述情景其实都是重复创建了大量相似乃至相同的对象，我们就想，能不能把对象拿来复用？听起来好像和单例有点像，两者的区别我们稍后再说，先看享元实现俄罗斯方块共享，抽象方块类：
+
+```Java
+abstract class AbstractBox {
+    public abstract String getShape();
+
+    public void display(String color) {
+        System.out.println("方块形状：" + this.getShape() + " 颜色：" + color);
+    }
+}
+```
+
+不同形状的方块：
+
+```Java
+class IBox extends AbstractBox {
+    @Override
+    public String getShape() {
+        return "I";
+    }
+}
+
+class LBox extends AbstractBox {
+    @Override
+    public String getShape() {
+        return "L";
+    }
+}
+
+class OBox extends AbstractBox {
+    @Override
+    public String getShape() {
+        return "O";
+    }
+}
+```
+
+关键代码来了，我们需要一个工厂来复用对象，同时这个工厂最好是单例的，让我们在程序的整个运行生命周期都是同一个工厂：
+
+```Java
+class BoxFactory {
+    private static HashMap<String, AbstractBox> map;
+    
+    private BoxFactory() {
+        map = new HashMap<>();
+        loadBoxes();
+    }
+    
+    public static BoxFactory getInstance() {
+        return SingletonHolder.INSTANCE;
+    }
+    
+    private static class SingletonHolder {
+        private static final BoxFactory INSTANCE = new BoxFactory();
+    }
+    
+    public AbstractBox getBox(String key) {
+        return map.get(key);
+    }
+
+    private void loadBoxes() {
+        Properties prop = new Properties();
+        try (InputStream input = BoxFactory.class.getClassLoader().getResourceAsStream("flyweightconfig.properties")) {
+            prop.load(input);
+            for (String key : prop.stringPropertyNames()) {
+                String className = prop.getProperty(key);
+                try {
+                    Class<?> clazz = Class.forName(className);
+                    AbstractBox box = (AbstractBox) clazz.getDeclaredConstructor().newInstance();
+                    map.put(key, box);
+                } catch (Exception e) {
+                    e.printStackTrace();
+                }
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+这里我采取的是从配置文件从读取需要共享的类，并放入工厂的map中，配置文件信息如下：
+
+```properties
+I=com.example.designpattern.flyweight.IBox
+L=com.example.designpattern.flyweight.LBox
+O=com.example.designpattern.flyweight.OBox
+```
+
+可以看到对象被我们创建并放入到map中，客户端需要获取对象是可以复用对象的：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        BoxFactory factory = BoxFactory.getInstance();
+        AbstractBox iBox1 = factory.getBox("I");
+        AbstractBox iBox2 = factory.getBox("I");
+        AbstractBox lBox1 = factory.getBox("L");
+        AbstractBox lBox2 = factory.getBox("L");
+        AbstractBox oBox1 = factory.getBox("O");
+        AbstractBox oBox2 = factory.getBox("O");
+        System.out.println(iBox1 == iBox2);
+        System.out.println(lBox1 == lBox2);
+        System.out.println(oBox1 == oBox2);
+        iBox1.display("红色");
+        iBox2.display("绿色");
+        lBox1.display("蓝色");
+        lBox2.display("紫色");
+        oBox1.display("粉色");
+        oBox2.display("白色");
+    }
+}
+```
+
+这里的iBox1和iBox2，lBox1和lBox2，oBox1和oBox2是同一个对象，但他们可以有不同的颜色展示。实现了对象的复用，减少内存开销。
+
+我们再来看享元模式和单例模式的区别：
+
+- 单例模式保证一个类只有一个实例，并提供一个全局访问点。常被用来**管理**一些共享的资源，比如数据库连接池、线程池等
+
+- 享元模式是尽可能地**减少系统中的对象数量**，从而提高系统的性能。它通过共享具有相同状态的对象来达到这个目的。享元模式通常会定义一个工厂类来创建和管理共享的对象，而客户端在使用时只需要向工厂类请求共享对象即可。
+
+我们再回头看享元模式的定义：
+
+> 运用共享技术来有效地支持大量细粒度对象的复用。它通过共享已经存在的对象来大幅度减少需要创建的对象数量、避免大量相似对象的开销，从而提高系统资源的利用率。
+
+**说人话**其实就是***重复利用对象，减少资源开销***
+
+我们再回头看享元模式出现的角色：
+
+- 抽象享元角色（Flyweight）：通常是一个接口或抽象类，在抽象享元类中声明了具体享元类公共的方法，这些方法可以向外界提供享元对象的内部数据（内部状态），同时也可以通过这些方法来设置外部数据（外部状态）。（AbstractBox）
+
+- 具体享元（Concrete Flyweight）角色 ：它实现了抽象享元类，称为享元对象；在具体享元类中为内部状态提供了存储空间。通常我们可以结合单例模式来设计具体享元类，为每一个具体享元类提供唯一的享元对象。（IBox，LBox，OBox）
+
+- 非享元（Unsharable Flyweight)角色 ：并不是所有的抽象享元类的子类都需要被共享，不能被共享的子类可设计为非共享具体享元类；当需要一个非共享具体享元类的对象时可以直接通过实例化创建。（本例中未出现）
+
+- 享元工厂（Flyweight Factory）角色 ：负责创建和管理享元角色。当客户对象请求一个享元对象时，享元工厂检査系统中是否存在符合要求的享元对象，如果存在则提供给客户；如果不存在的话，则创建一个新的享元对象。（BoxFactory）
