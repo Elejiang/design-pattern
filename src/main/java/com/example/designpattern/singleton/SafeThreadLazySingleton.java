@@ -6,9 +6,11 @@ package com.example.designpattern.singleton;
 class SafeThreadLazySingleton {
     private static SafeThreadLazySingleton instance;
     private SafeThreadLazySingleton(){}
-    public static synchronized SafeThreadLazySingleton getInstance() {
-        if (instance == null) {
-            instance = new SafeThreadLazySingleton();
+    public static SafeThreadLazySingleton getInstance() {
+        synchronized (SafeThreadLazySingleton.class) {
+            if (instance == null) {
+                instance = new SafeThreadLazySingleton();
+            }
         }
         return instance;
     }

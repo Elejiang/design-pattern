@@ -343,5 +343,158 @@ class Main {
 
 - 具体产品：实现了抽象产品角色所定义的接口，由具体工厂来创建，它 同具体工厂之间是多对一的关系。（ACar、ABike、BCar和BBike）
 
+### 单例模式
 
+> 确保一个类最多只有一个实例，并提供一个全局访问点
 
+有的时候我们希望一个对象在全局是唯一的，在程序的这次运行过程中，不管我什么时候、在哪里、多少次获取这个对象，它还是那个它。
+
+听起来很简单，我们来看实现，单例的实现分为两种：
+
+- 饿汉式：类加载就会导致该单实例对象被创建
+
+- 懒汉式：类加载不会导致该单实例对象被创建，而是首次使用该对象时才会创建
+
+饿汉式的话对象直接被创建，如果对象很大，而一时半会又没被用上，就会导致内存空间的浪费；懒汉的话不会导致内存空间的浪费，被用上了我才创建，但实现一般都较为复杂。
+
+1. 饿汉式
+
+   ```Java
+   class EagerSingleton {
+       private static EagerSingleton instance = new EagerSingleton();
+       
+       private EagerSingleton(){}
+       
+       public static EagerSingleton getInstance() {
+           return instance;
+       }
+   }
+   ```
+
+   私有化构造，想获取对象只能调用getInstance()方法，而这个方法返回的对象是static静态成员变量，在类加载的时候就被创建。有的会把静态成员变量的赋值放到静态代码块中，两者没啥区别，都是随着类的加载被创建。
+
+2. 懒汉式-方式1（线程不安全）
+
+   ```Java
+   class UnsafeThreadLazySingleton {
+       private static UnsafeThreadLazySingleton instance;
+       
+       private UnsafeThreadLazySingleton(){}
+       
+       public static UnsafeThreadLazySingleton getInstance() {
+           if (instance == null) {
+               instance = new UnsafeThreadLazySingleton();
+           }
+           return instance;
+       }
+   }
+   ```
+
+   同样是私有化构造和静态成员变量的形式，但赋值操作被推迟到了getInstance()，只有第一次调用getInstance()时才会创建对象，但这显然是线程不安全的，多线程下可能导致instance被多次重新赋值。
+
+3. 懒汉式-方式2（线程安全）
+
+   ```Java
+   class SafeThreadLazySingleton {
+       private static SafeThreadLazySingleton instance;
+       
+       private SafeThreadLazySingleton(){}
+       
+       public static SafeThreadLazySingleton getInstance() {
+           synchronized (SafeThreadLazySingleton.class) {
+               if (instance == null) {
+                   instance = new SafeThreadLazySingleton();
+               }
+           }
+           return instance;
+       }
+   }
+   ```
+
+   我们自然想到加锁来保证线程安全，但这又引发了性能问题——我每次要获取对象时还要经过一层繁重的锁检验？要知道，我只是在首次使用需要创建对象的时候才可能引发并发问题，对象一旦被创建完毕，if (instance == null) 如同虚设，永远不成立，我锁住了一段”无效代码“？
+
+4. 懒汉式-方式3（双重检查锁）
+
+   ```Java
+   class DCLLazySingleton {
+       private static volatile DCLLazySingleton instance;
+       
+       private DCLLazySingleton(){}
+       
+       public static DCLLazySingleton getInstance() {
+           if (instance == null) {
+               synchronized (DCLLazySingleton.class) {
+                   if (instance == null) {
+                       instance = new DCLLazySingleton();
+                   }
+               }
+           }
+           return instance;
+       }
+   }
+   ```
+
+   直接加锁会导致性能问题，我们就改变加锁的条件，只有instance为null的时候，也就是首次使用需要创建对象的时候，我们才进入锁竞争，对象创建的环节。代码中出现了两个if判断，这就是大名鼎鼎的DCL，double-checked locking 双检锁。
+
+   第一个if判断：判断是否是第一次获取对象，因为是懒汉式，如果是第一次获取对象，就进入创建对象环节，否则直接返回对象——要知道if判断可比锁竞争轻量多了
+
+   第二个if判断：第一个if判断可能放进来很多狼（线程），这些狼（线程）被门（锁）挡在外面，第一个进来的狼直接取走了肉（创建了对象），但门（锁）外的狼（线程）不知道啊，等第一个狼（线程）走的时候，门（锁）外的狼（线程）又进来一头，这时候需要用**第二个if**告诉它，你走吧，肉（对象）已经被取走（创建）了，你别再取（创建）了，我只有一块肉（只要一个对象）。
+
+   可以看到，这里的instance是被volatile修饰的，这涉及到对象的创建过程，指令重排等问题，被volatile修饰后可以禁止指令重排，保证**对象的创建是完整的，不会出现空指针问题**。
+
+5. 懒汉式-方式4（静态内部类方式）
+
+   ```Java
+   class StaticInnerClass {
+       private StaticInnerClass(){}
+       
+       private static class StaticInnerClassHolder {
+           private static final StaticInnerClass INSTANCE = new StaticInnerClass();
+       }
+       
+       public static StaticInnerClass getInstance() {
+           return StaticInnerClassHolder.INSTANCE;
+       }
+   }
+   ```
+
+   JVM 在加载外部类的过程中，是不会加载静态内部类的，只有内部类的属性/方法被调用时才会被加载，并初始化其静态属性。也就是说只有第一次调用getInstance()方法时，涉及到静态内部类，这时StaticInnerClassHolder才会被加载，加载时初始化其静态属性INSTANCE，同时被getInstance()方法返回。由于是类加载的形式，所以是线程安全的，同时避免了使用锁，性能也客观。
+
+6. 枚举
+
+   ```Java
+   enum EnumSingleton {
+       INSTANCE;
+   }
+   ```
+
+   十分简洁优雅，唯一不会被破坏的单例模式，绝对单例，线程安全。属于饿汉式。
+
+我们来看上述单例如何获取：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        UnsafeThreadLazySingleton instance1 = UnsafeThreadLazySingleton.getInstance();
+        SafeThreadLazySingleton instance2 = SafeThreadLazySingleton.getInstance();
+        EagerSingleton instance3 = EagerSingleton.getInstance();
+        DCLLazySingleton instance4 = DCLLazySingleton.getInstance();
+        StaticInnerClass instance5 = StaticInnerClass.getInstance();
+        EnumSingleton instance6 = EnumSingleton.INSTANCE;
+    }
+}
+```
+
+单例模式中单例类中一般都有其余方法，获取单例后可以使用这些方法。
+
+破坏单例：
+
+- 序列化与反序列化：单例类实现Serializable接口，将对象写入文件后读取，每次读取到的是不同对象
+- 反射：将无参构造通过反射设置为可见，然后创建对象，创建得到的是不同对象
+
+反破坏单例：
+
+- 序列化与反序列化：单例类中定义private Object readResolve()方法，方法返回单例对象。因为在反序列化时如果类中有个叫readResolve的方法，就会执行这个方法并返回结果。
+- 反射：私有构造方法进行单例对象的非空判断即可，如果不为空，说明已经存在单例对象了，还想反射创建新的单例对象是不允许的，抛异常；为空，允许创建。
+
+单例模式较为简单，但实现方法较多，需要根据不同场景下选择不同方式实现。
