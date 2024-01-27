@@ -20,6 +20,10 @@
 
 ## 创建型模式
 
+> 对类的实例化过程进行了抽象，能够将软件模块中对象的创建和对象的使用分离。
+
+**说人话**其实就是***创建对象用的模式***
+
 ### 简单工厂模式
 
 > 定义了一个创建对象的类，由这个类来封装实例化对象的行为。  
@@ -498,3 +502,254 @@ class Main {
 - 反射：私有构造方法进行单例对象的非空判断即可，如果不为空，说明已经存在单例对象了，还想反射创建新的单例对象是不允许的，抛异常；为空，允许创建。
 
 单例模式较为简单，但实现方法较多，需要根据不同场景下选择不同方式实现。
+
+### 原型模式
+
+> 用一个已经创建的实例作为原型，通过复制该原型对象来创建一个和原型对象相同的新对象。
+
+假如我在使用一个对象，用着挺爽的，这时别人说你对象给我爽爽，我又不太想把对象分享给他，我就在想，要是我能把我对象当场撕裂成一个双胞胎多好啊，不，三胞胎，四胞胎......
+
+怎么克隆呢？先定义一个接口：
+
+```Java
+public interface Cloneable {
+    protected Object clone();
+}
+```
+
+在Java中JDK给出了Cloneable接口，且为空，即：
+
+```Java
+public interface Cloneable {
+}
+```
+
+因为Object中有clone()方法，子类直接重写即可，Cloneable只需要定义规范，不需要定义方法
+
+让对象类实现这个接口：
+
+```Java
+class Person implements Cloneable {
+    private String name;
+    
+    private int age;
+    
+    public Person() {
+    }
+    
+    public Person(String name, int age) {
+        this.name = name;
+        this.age = age;
+    }
+    
+    @Override
+    public Person clone() throws CloneNotSupportedException {
+        return (Person) super.clone();
+    }
+}
+```
+
+这里方便起见我并没有展示get和set等方法。重写的clone方法直接调用父类（Object）中的方法即可。
+
+来看看客户端怎么使用：
+
+```Java
+class Main {
+    public static void main(String[] args) throws CloneNotSupportedException {
+        Person zhangsan = new Person("张三", 23);
+        Person zhangsanClone = zhangsan.clone();
+        System.out.println(zhangsan.toString());
+        System.out.println(zhangsanClone.toString());
+    }
+}
+```
+
+这时zhangsan和zhangsanClone是同一个类的两个不同的对象，但其内部的属性是一样的。
+
+原型模式的克隆分为浅克隆和深克隆，又叫浅拷贝和深拷贝。
+
+>浅克隆：创建一个新对象，新对象的属性和原来对象完全相同，对于非基本类型属性，仍指向原有属性所指向的对象的内存地址。
+>
+>深克隆：创建一个新对象，属性中引用的其他对象也会被克隆，不再指向原有对象地址。
+
+**说人话**其实就是浅克隆中，母体和克隆体的***引用数据类型***还是指向原来的相同对象；深克隆中，母体和克隆体的***引用数据类型***也进行了深克隆，是不同的对象。
+
+上述直接使用Object中的clone方法属于浅克隆，要进行深克隆的话将对象写入文件后再读取即可。
+
+我们再回头看原型模式的定义：
+
+> 用一个已经创建的实例作为原型，通过复制该原型对象来创建一个和原型对象相同的新对象。
+
+**说人话**其实就是***将一个对象克隆一份，获得新对象，新对象和原对象的内部属性相同***
+
+我们再看看原型模型中出现的角色：
+
+- 抽象原型类：规定了具体原型对象必须实现的的 clone() 方法。（Cloneable）
+
+- 具体原型类：实现抽象原型类的 clone() 方法，它是可被复制的对象。（Person）
+
+- 访问类：使用具体原型类中的 clone() 方法来复制新的对象。（Main）
+
+### 建造者模式
+
+> 使用多个简单的对象一步步构建成一个复杂的对象，将一个复杂对象的构建与表示分离，使得同样的构建过程可以创建不同的表示。
+
+先不管定义，我们知道一台电脑主机，里面有cpu，显卡，内存，硬盘等，这些组件(简单对象)是不会变的，但每个简单的对象有不同品牌，不同品牌的组合可以组合成不同主机(复杂对象)，这里我们先来一个电脑类：
+
+```Java
+class Computer {
+    private String audio;
+    private String keyboard;
+    private String master;
+    private String mouse;
+    private String screen;
+}
+```
+
+这里方便起见，没有展示get和set等方法，我们知道电脑由音响，键盘，主机，鼠标，显示器组成就行了。
+
+我们来看一个抽象的电脑组装类：
+
+```Java
+abstract class ComputerBuilder {
+    Computer computer = new Computer();
+    
+    public Computer getComputer() {
+        return computer;
+    }
+    
+    public abstract void buildAudio();
+    public abstract void buildKeyboard();
+    public abstract void buildMaster();
+    public abstract void buildMouse();
+    public abstract void buildScreen();
+}
+```
+
+这里具体组件的构件都是抽象方法，我们来看具体的构建类是怎么组装一台电脑的：
+
+```Java
+class HPComputerBuilder extends ComputerBuilder{
+    @Override
+    public void buildAudio() {
+        computer.setAudio("hp音响");
+    }
+    @Override
+    public void buildKeyboard() {
+        computer.setKeyboard("hp键盘");
+    }
+    @Override
+    public void buildMaster() {
+        computer.setMaster("hp主机");
+    }
+    @Override
+    public void buildMouse() {
+        computer.setMouse("hp鼠标");
+    }
+    @Override
+    public void buildScreen() {
+        computer.setScreen("hp显示器");
+    }
+}
+```
+
+这里定义一个HP电脑建造者，将父类的computer中的每个简单对象构建出来，但具体怎么组装其实是不归它管的，我们需要再来个指挥者：
+
+```Java
+class Director {
+    private ComputerBuilder computerBuilder;
+
+    public Director(ComputerBuilder computerBuilder) {
+        this.computerBuilder = computerBuilder;
+    }
+
+    public Computer constructComputer() {
+        computerBuilder.buildMaster();
+        computerBuilder.buildAudio();
+        computerBuilder.buildKeyboard();
+        computerBuilder.buildMouse();
+        computerBuilder.buildScreen();
+        return computerBuilder.getComputer();
+    }
+}
+```
+
+往指挥者传入建造者后，指挥者有个方法指挥建造者如何组装，一般来说有顺序要求，先组装这个，再组装那个，这些顺序的控制就由指挥者的这个方法来控制，指挥者只管指挥顺序组装，创建组件的任务是建造者的。
+
+来看客户端如何获取到一台电脑：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        // 指挥者传入不同建造者即可建造同一复杂产品的不同组合
+        Director director = new Director(new HPComputerBuilder());
+        Computer computer = director.constructComputer();
+        System.out.println(computer.toString());
+    }
+}
+```
+
+往指挥者传入建造者，然后指挥一下，就获取到对象了，我想新增一种组合，只需要新增一个建造者：
+
+```Java
+class DELLComputerBuilder extends ComputerBuilder{
+    @Override
+    public void buildAudio() {
+        computer.setAudio("dell音响");
+    }
+    @Override
+    public void buildKeyboard() {
+        computer.setKeyboard("dell键盘");
+    }
+    @Override
+    public void buildMaster() {
+        computer.setMaster("dell主机");
+    }
+    @Override
+    public void buildMouse() {
+        computer.setMouse("dell鼠标");
+    }
+    @Override
+    public void buildScreen() {
+        computer.setScreen("dell显示器");
+    }
+}
+```
+
+再往指挥者传入这个建造者对象，就可以获取到同一复杂产品（电脑）相同建造顺序（指挥者指挥顺序）的不同简单产品（电脑组件）的组合。
+
+建造者模式优点：
+
+- 建造者模式的封装性很好。使用建造者模式可以有效的封装变化，在使用建造者模式的场景中，一般产品类和建造者类是比较稳定的，因此，将主要的业务逻辑封装在指挥者类中对整体而言可以取得比较好的稳定性。
+
+- 在建造者模式中，客户端不必知道产品内部组成的细节，将产品本身与产品的创建过程解耦，使得相同的创建过程可以创建不同的产品对象。
+
+- 可以更加精细地控制产品的创建过程 。将复杂产品的创建步骤分解在不同的方法中，使得创建过程更加清晰，也更方便使用程序来控制创建过程。
+
+- 建造者模式很容易进行扩展。如果有新的需求，通过实现一个新的建造者类就可以完成，基本上不用修改之前已经测试通过的代码，因此也就不会对原有功能引入风险。符合开闭原则。
+
+缺点：
+
+- 造者模式所创建的产品一般具有较多的共同点，其组成部分相似，如果产品之间的差异性很大，则不适合使用建造者模式，因此其使用范围受到一定的限制。
+
+建造者模式和工厂方法模式对比：
+
+> 工厂方法模式注重的是整体对象的创建方式；而建造者模式注重的是部件构建的过程，意在通过一步一步地精确构造创建出一个复杂的对象。
+>
+> 我们举个简单例子来说明两者的差异，如要制造一个超人，如果使用工厂方法模式，直接产生出来的就是一个力大无穷、能够飞翔、内裤外穿的超人；而如果使用建造者模式，则需要组装手、头、脚、躯干等部分，然后再把内裤外穿，于是一个超人就诞生了。
+
+我们再回头看建造者模式定义：
+
+> 使用多个简单的对象一步步构建成一个复杂的对象，将一个复杂对象的构建与表示分离，使得同样的构建过程可以创建不同的表示。
+
+**说人话**其实就是***一个复杂对象有多个简单对象，我搞个建造者，这个建造者来创建每个简单对象，再来个指挥者，指挥者来把这些简单对象按照顺序来组合成一个复杂对象***
+
+我们再看建造者模式出现的角色：
+
+- 抽象建造者类：这个接口规定要实现复杂对象的那些部分的创建，并不涉及具体的部件对象的创建。 （ComputerBuilder）
+
+- 具体建造者类：实现 Builder 接口，完成复杂产品的各个部件的具体创建方法。在构造过程完成后，提供产品的实例。 （HPComputerBuilder和DELLComputerBuilder）
+
+- 产品类：要创建的复杂对象。（Computer）
+
+- 指挥者类：调用具体建造者来创建复杂对象的各个部分，在指导者中不涉及具体产品的信息，只负责保证对象各部分完整创建或按某种顺序创建。 （Director）
