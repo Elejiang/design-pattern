@@ -2999,3 +2999,298 @@ class Main {
 
 > 给定一个语言，定义它的文法表示，并定义一个解释器，这个解释器使用该标识来解释语言中的句子。
 
+说白了，约定一门语言，然后搞个解释器把他翻译翻译，比如MySQL翻译SQL语言，我们弄个简单版的~
+
+先把一些概念说清楚，一条SQL，"select id, name from student where id = 1"按照颗粒细分，可以拆分为"select", "id", "," "name", "from", "student", "where", "id", "=", "1"这些，其中标点符号我们是不关心的，而”id“, "name","student","1"这些其实就算是**终结符表达式**；"select","from","where"这些就算是**非终结符表达式**，我们可以看到，终结符表达式是不可拆分的最小单元，而非终结符表达式一般需要配合几个终结符表达式来进行运算，例如"select"这个非终结符表达式其实是需要跟上"id","name"这两个终结符表达式才有意义的，"from"需要"student","where"需要”id“和"1"。
+
+那么上述SQL根据非终结符表达式的运算就可以翻译成”返回id，name列“，”从学生表中“,”查询id = 1的数据“，再把三个运算结果按照顺序组合，完成输出结果就是”从学生表中查询id = 1的数据，返回id，name列“。不管是终结符表达式还是非终结符表达式，都属于表达式，且都需要被翻译，所以有表达式接口：
+
+```Java
+interface Expression {
+    String interpret(Context context);
+}
+```
+
+Context其实就是一个管理上下文资源与最终结果的环境：
+
+```Java
+class Context {
+    // 最终返回结果
+    private StringBuilder result = new StringBuilder();
+    // 上下文资源
+    private HashMap<String, String> map = new HashMap<>();
+    // 创建Context的时候加载资源
+    public Context() {
+        loadMap();
+    }
+
+    public String getValue(String key) {
+        return map.get(key);
+    }
+
+    public StringBuilder getResult() {
+        return result;
+    }
+    // 从配置文件中读取资源，放入map中
+    public void loadMap() {
+        Properties prop = new Properties();
+        try (InputStream input = Context.class.getClassLoader().getResourceAsStream("interpreter.properties")) {
+            InputStreamReader reader = new InputStreamReader(input, StandardCharsets.UTF_8);
+            prop.load(reader);
+            for (String key : prop.stringPropertyNames()) {
+                String value = prop.getProperty(key);
+                map.put(key, value);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
+
+来看配置文件中都有什么：
+
+```properties
+student=学生
+id=id
+name=名字
+```
+
+其实就相当于字典，我们再来看字符串终结符表达式：
+
+```Java
+class StringTerminalExpression implements Expression{
+    private String val;
+
+    public StringTerminalExpression(String val) {
+        this.val = val;
+    }
+    
+    @Override
+    public String interpret(Context context) {
+        String interpretResult = context.getValue(val);
+        return interpretResult == null ? val : interpretResult;
+    }
+}
+```
+
+对于终结符表达式，解释的结果其实就是先去找下有没有这个字符串对应的翻译，有的话把翻译的结果返回，否则返回本身，例如”student“的解释结果是”学生“，“1”的解释结果还是“1”
+
+再看select这个非终结符表达式：
+
+```Java
+class SelectExpression implements Expression{
+    private List<Expression> cols = new ArrayList<>();
+
+    public void addCols(Expression col) {
+        cols.add(col);
+    }
+
+    @Override
+    public String interpret(Context context) {
+        StringJoiner interpretResult = new StringJoiner(", ");
+        for (Expression col : cols) {
+            interpretResult.add(col.interpret(context));
+        }
+        context.getResult().append("返回").append(interpretResult).append("列");
+        return interpretResult.toString();
+    }
+}
+```
+
+select非终结符表达式需要其它终结符表达式（查询哪几列）来进行运算（字符串拼接），解释的结果其实拼接在context里的result的，例如这里解释的结果就是**“返回id, 名字列"**
+
+再看from这个非终结符表达式：
+
+```Java
+class FromExpression implements Expression {
+    private Expression table;
+
+    public FromExpression(Expression table) {
+        this.table = table;
+    }
+
+    @Override
+    public String interpret(Context context) {
+        String interpretResult = "从" + table.interpret(context) + "表中查询";
+        context.getResult().append(interpretResult);
+        return interpretResult;
+    }
+}
+```
+
+from非终结符表达式需要再来一个终结符表达式（表名）来进行解释，解释的结果是**”从学生表中查询“**
+
+再看where这个非终结符表达式：
+
+```java
+class WhereExpression implements Expression{
+    private StringTerminalExpression filed;
+    private StringTerminalExpression value;
+
+    public WhereExpression(StringTerminalExpression filed, StringTerminalExpression value) {
+        this.filed = filed;
+        this.value = value;
+    }
+
+    @Override
+    public String interpret(Context context) {
+        String interpretResult = filed.interpret(context) + " = " + value.interpret(context);
+        context.getResult().append(interpretResult).append("的数据，");
+        return interpretResult;
+    }
+}
+```
+
+where同样需要两个终结符表达式来进行解释（这里没考虑多条件查询，只是简单的单条件查询），where的解释结果为**”id = 1的数据，“**
+
+我们现在通过三个非终结符解释器，已经可以拿到了**“返回id, 名字列"，"从学生表中查询"，”id = 1的数据，“**这三个解释，我们**按照一定的顺序先后解释**，就可以拿到最终的解释结果：**”从学生表中查询id = 1的数据，返回id，名字列“**
+
+好，那具体怎么操作，我们需要再来个Client类，帮助我们把这些解释串起来，**仔细看代码中的注释**：
+
+```Java
+class Client {
+    // SQL中的单词
+    private String[] SQL;
+    // Context上下文环境类
+    private Context context = new Context();
+    // 指示现在获取到哪个单词了
+    private int nextExpressionIndex = 0;
+    // 把一条完整SQL进行分词，去除空格，逗号，等号，分号
+    public Client(String SQL) {
+        this.SQL = SQL.split("[\\s,=;]+");
+    }
+    // 获取解释结果
+    public String getInterpretResult() {
+        // 先获取到sql的第一个单词，判断是什么类型sql，我们这里只实现了查询sql
+        String sqlType = nextExpression();
+        switch (sqlType) {
+            // 如果是查询sql，返回查询sql解析结果
+            case "select" : return interpretSelectSQL();
+            // 如果是更新sql，返回更新sql解析结果，
+            case "update" : return "暂不支持解析update语句";
+            default: return "无法解析SQL";
+        }
+    }
+    //获取到下一个单词
+    private String nextExpression() {
+        return nextExpressionIndex < SQL.length ? SQL[nextExpressionIndex++] : null;
+    }
+    // 解析查询sql，此时已经指向了第二个单词
+    private String interpretSelectSQL() {
+        // 先创建select解释器，需要传入列来解释
+        SelectExpression selectExpression = new SelectExpression();
+        String col = nextExpression();
+        // 如果到了“from”这个单词，说明列已经全部放入select解释器了，开始解释from
+        while (!"from".equals(col)) {
+            selectExpression.addCols(new StringTerminalExpression(col));
+            col = nextExpression();
+        }
+        // from解释器需要传入一个表名，而from后面一个单词就是了，直接传入即可
+        FromExpression fromExpression = new FromExpression(new StringTerminalExpression(nextExpression()));
+        // 这里有个where单词，先让遍历跳过，然后往where解释器传入一对key-value
+        nextExpression();
+        WhereExpression whereExpression = new WhereExpression(new StringTerminalExpression(nextExpression()), new StringTerminalExpression(nextExpression()));
+
+        // 解释器已经准备完毕，开始解释，注意按照一定顺序，先解释from，再解释where，再解释select
+        fromExpression.interpret(context);
+        whereExpression.interpret(context);;
+        selectExpression.interpret(context);
+        return context.getResult().toString();
+    }
+}
+```
+
+来看客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Client client = new Client("select id, name from student where id = 1");
+        String interpretResult = client.getInterpretResult();
+        System.out.println(interpretResult);
+    }
+}
+```
+
+打印输出结果：从学生表中查询id = 1的数据，返回id, 名字列
+
+这样，我们就完成了一个简单的单表单条件的查询SQL解释。可以看到，解释的过程中是很看重SQL的语法的，必须是“select 列1, 列2, 列3 from 表名 where key = value”这种形式，列可以有多个，但最好在配置文件中给出翻译。
+
+我们再回头看解释器模式的定义：
+
+> 给定一个语言，定义它的文法表示，并定义一个解释器，这个解释器使用该标识来解释语言中的句子。
+
+**说人话**其实就是***约定一门语言，你按照约定好的语法来写，我就能解释你是什么意思***
+
+我们再看解释器模式中出现的角色：
+
+- 抽象表达式：定义解释器的接口，约定解释器的解释操作，主要包含解释方法 interpret()。（Expression）
+
+- 终结符表达式：是抽象表达式的子类，用来实现文法中与终结符相关的操作，文法中的每一个终结符都有一个具体终结表达式与之相对应。（StringTerminalExpression）
+
+- 非终结符表达式：也是抽象表达式的子类，用来实现文法中与非终结符相关的操作，文法中的每条规则都对应于一个非终结符表达式。（SelectExpression、WhereExpression 和 FromExpression）
+
+- 环境：通常包含各个解释器需要的数据或是公共的功能，一般用来传递被所有解释器共享的数据，后面的解释器可以从这里获取这些值。（Context）
+
+- 客户端：主要任务是将需要分析的句子或表达式转换成使用解释器对象描述的抽象语法树，然后调用解释器的解释方法，当然也可以通过环境角色间接访问解释器的解释方法。（Client）
+
+## 设计模式六大原则
+
+> 这里再补充一下设计模式原则，之所以放到后面是因为我个人觉得其实学完设计模式再看设计模式的原则虽然不符合正常的学习顺序，但却能对六大原则有更深的感悟
+
+### 总原则——开闭原则
+
+> 一个软件实体，如类、模块和函数应该对扩展开放，对修改关闭。
+
+在程序需要进行拓展的时候，不能去修改原有的代码，而是要扩展原有代码，实现一个热插拔的效果。所以一句话概括就是：为了使程序的扩展性好，易于维护和升级。
+
+想要达到这样的效果，我们需要使用接口和抽象类等。
+
+### 单一职责原则
+
+> 一个类应该只有一个发生变化的原因。
+
+不要存在多于一个导致类变更的原因，也就是说每个类应该实现单一的职责，否则就应该把类拆分。
+
+### 里氏替换原则
+
+> 所有引用基类的地方必须能透明地使用其子类的对象。
+
+任何基类可以出现的地方，子类一定可以出现。里氏替换原则是继承复用的基石，只有当衍生类可以替换基类，软件单位的功能不受到影响时，基类才能真正被复用，而衍生类也能够在基类的基础上增加新的行为。
+
+里氏代换原则是对“开-闭”原则的补充。实现“开闭”原则的关键步骤就是抽象化。而基类与子类的继承关系就是抽象化的具体实现，所以里氏替换原则是对实现抽象化的具体步骤的规范。里氏替换原则中，子类对父类的方法尽量不要重写和重载。因为父类代表了定义好的结构，通过这个规范的接口与外界交互，子类不应该随便破坏它。
+
+### 依赖倒装原则
+
+> 1、上层模块不应该依赖底层模块，它们都应该依赖于抽象。
+>
+> 2、抽象不应该依赖于细节，细节应该依赖于抽象。
+
+面向接口编程，依赖于抽象而不依赖于具体。写代码时用到具体类时，不与具体类交互，而与具体类的上层接口交互。
+
+### 接口隔离原则
+
+> 1、客户端不应该依赖它不需要的接口。
+>
+> 2、类间的依赖关系应该建立在最小的接口上。
+
+每个接口中不存在子类用不到却必须实现的方法，如果不然，就要将接口拆分。使用多个隔离的接口，比使用单个接口（多个接口方法集合到一个的接口）要好。
+
+### 迪米特法则（最少知道原则）
+
+> 只与你的直接朋友交谈，不跟“陌生人”说话。
+
+一个类对自己依赖的类知道的越少越好。无论被依赖的类多么复杂，都应该将逻辑封装在方法的内部，通过public方法提供给外部。这样当被依赖的类变化时，才能最小的影响该类。
+
+最少知道原则的另一个表达方式是：只与直接的朋友通信。类之间只要有耦合关系，就叫朋友关系。耦合分为依赖、关联、聚合、组合等。我们称出现为成员变量、方法参数、方法返回值中的类为直接朋友。局部变量、临时变量则不是直接的朋友。我们要求陌生的类不要作为局部变量出现在类中。
+
+### 合成复用原则
+
+> 尽量使用对象组合/聚合，而不是继承关系达到软件复用的目的。
+
+合成或聚合可以将已有对象纳入到新对象中，使之成为新对象的一部分，因此新对象可以调用已有对象的功能。
+
+## 写在后面
+
+至此，23种设计模式全部学完（还送了个不属于设计模式的简单工厂模式呢）。
