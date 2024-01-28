@@ -18,7 +18,7 @@ class StudentAggregateImpl implements Aggregate {
     }
 
     @Override
-    public StudentIteratorImpl getIterator() {
+    public Iterator getIterator() {
         return new StudentIteratorImpl(list);
     }
 }

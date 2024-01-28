@@ -1682,3 +1682,1320 @@ class Main {
 - 非享元（Unsharable Flyweight)角色 ：并不是所有的抽象享元类的子类都需要被共享，不能被共享的子类可设计为非共享具体享元类；当需要一个非共享具体享元类的对象时可以直接通过实例化创建。（本例中未出现）
 
 - 享元工厂（Flyweight Factory）角色 ：负责创建和管理享元角色。当客户对象请求一个享元对象时，享元工厂检査系统中是否存在符合要求的享元对象，如果存在则提供给客户；如果不存在的话，则创建一个新的享元对象。（BoxFactory）
+
+## 行为型模式
+
+> 行为型模式用于描述程序在运行时复杂的流程控制，即描述多个类或对象之间怎样相互协作共同完成单个对象都无法单独完成的任务，它涉及算法与对象间职责的分配。
+
+**说人话**其实就是***类与类互帮互助，做大做强的***
+
+### 策略模式
+
+> 定义了一系列算法，并将每个算法封装起来，使它们可以相互替换，且算法的变化不会影响使用算法的客户。策略模式属于对象行为模式，它通过对算法进行封装，把使用算法的责任和算法的实现分割开来，并委派给不同的对象对这些算法进行管理。
+
+商场时不时就有促销活动，有中秋促销，国庆促销，春节促销，平时也动不动整个促销，每个促销活动的优惠都不太一样，中秋是买一送一，国庆是满200减50......正常来说，每种促销方案都是一个方法，然后用switch判断进行选择，但这样的代码明显是不符合开闭原则的。
+
+如果将每个方案都用类表示，再来个上下文环境替我们管理，就可以做到灵活切换了，直接看代码，策略类接口：
+
+```Java
+interface Strategy {
+    void show();
+}
+```
+
+不同策略：
+
+```Java
+class StrategyA implements Strategy {
+    public void show() {
+        System.out.println("买一送一");
+    }
+}
+
+class StrategyB implements Strategy {
+    public void show() {
+        System.out.println("满200元减50元");
+    }
+}
+
+class StrategyC implements Strategy {
+    public void show() {
+        System.out.println("满1000元加一元换购任意200元以下商品");
+    }
+}
+```
+
+上下文环境：
+
+```Java
+class Mall {
+    private Strategy strategy;
+
+    public void setStrategy(Strategy strategy) {
+        this.strategy = strategy;
+    }
+
+    public void mallShow() {
+        strategy.show();
+    }
+}
+```
+
+上下文环境中传入策略，然后调用方法就可以执行策略，根据传入的策略不同，可以有不同促销方案，客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Mall mall = new Mall();
+        
+        mall.setStrategy(new StrategyA());
+        mall.mallShow();
+        mall.setStrategy(new StrategyB());
+        mall.mallShow();
+        mall.setStrategy(new StrategyC());
+        mall.mallShow();
+    }
+}
+```
+
+如果要新增方案，直接新增一个策略类即可，然后往上下文环境Mall中传入即可。
+
+我们再回头看策略模式的定义：
+
+> 定义了一系列算法，并将每个算法封装起来，使它们可以相互替换，且算法的变化不会影响使用算法的客户。策略模式属于对象行为模式，它通过对算法进行封装，把使用算法的责任和算法的实现分割开来，并委派给不同的对象对这些算法进行管理。
+
+**说人话**其实就是***每种策略都是独立的，根据情况可以选择不同策略，灵活替换***
+
+我们再看策略模式中出现的角色：
+
+- 抽象策略类：这是一个抽象角色，通常由一个接口或抽象类实现。此角色给出所有的具体策略类所需的接口。（Strategy）
+
+- 具体策略类：实现了抽象策略定义的接口，提供具体的算法实现或行为。（StrategyA、StrategyB 和 StrategyC）
+
+- 环境类：持有一个策略类的引用，最终给客户端调用。（Mall）
+
+### 模板方法模式
+
+> 定义一个操作中的算法骨架，而将算法的一些步骤延迟到子类中，使得子类可以不改变该算法结构的情况下重定义该算法的某些特定步骤。
+
+炒菜的过程其实是有规律的，不管你是辣椒炒肉，手撕包菜，肉沫茄子.....都是倒油，热油，下菜，下调料，翻炒。其中倒油，热油，翻炒这几步是固定的，做不同菜的关键在于你下的菜和下的调料的不同，那我们其实就可以抽取出一个模板来简化做菜过程，做菜模板：
+
+```Java
+abstract class CookTemplate {
+    public final void cookProcess() {
+        //第一步：倒油
+        this.pourOil();
+        //第二步：热油
+        this.heatOil();
+        //第三步：倒蔬菜
+        this.pourVegetable();
+        //第四步：倒调味料
+        this.pourSauce();
+        //第五步：翻炒
+        this.fry();
+    }
+
+    public void pourOil() {
+        System.out.println("倒油");
+    }
+
+    public void heatOil() {
+        System.out.println("热油");
+    }
+
+    //第三步：倒的菜是不一样的
+    public abstract void pourVegetable();
+
+    //第四步：倒调味料是不一样
+    public abstract void pourSauce();
+
+    public void fry(){
+        System.out.println("炒啊炒啊炒到熟啊");
+    }
+}
+```
+
+这是个抽象类，里面有两个抽象方法，倒菜和倒调料需要交给不同的子类实现，其余方法都是固定的，而且整个炒菜的过程也给出了，同时用final修饰，防止子类篡改过程。
+
+炒茄子：
+
+```Java
+class CookEggplant extends CookTemplate{
+    @Override
+    public void pourVegetable() {
+        System.out.println("下锅的蔬菜是茄子");
+    }
+
+    @Override
+    public void pourSauce() {
+        System.out.println("下锅的酱料是蒜蓉");
+    }
+}
+```
+
+炒包菜：
+
+```Java
+class CookCabbage extends CookTemplate{
+    @Override
+    public void pourVegetable() {
+        System.out.println("下锅的蔬菜是包菜");
+    }
+
+    @Override
+    public void pourSauce() {
+        System.out.println("下锅的酱料是辣椒");
+    }
+}
+```
+
+客户端：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        CookCabbage cookCabbage = new CookCabbage();
+        cookCabbage.cookProcess();
+        CookEggplant cookEggplant = new CookEggplant();
+        cookEggplant.cookProcess();
+    }
+}
+```
+
+不同子类就可以做出不同的菜啦
+
+我们再回头看模板方法模式的定义：
+
+> 定义一个操作中的算法骨架，而将算法的一些步骤延迟到子类中，使得子类可以不改变该算法结构的情况下重定义该算法的某些特定步骤。
+
+**说人话**其实就是***给你个模板，你把里面不太确定的地方按照你自己的想法实现下，就有一个约定好的完整算法了***
+
+我们再看模板方法模式中出现的角色：
+
+- 抽象类：负责给出一个算法的轮廓和骨架。它由一个模板方法和若干个基本方法构成。（CookTemplate）
+  - 模板方法：定义了算法的骨架，按某种顺序调用其包含的基本方法。（cookProcess()）
+  - 基本方法：是实现算法各个步骤的方法，是模板方法的组成部分。基本方法又可以分为三种：
+    - 抽象方法：一个抽象方法由抽象类声明、由其具体子类实现。(pourVegetable() 和 pourSauce())
+    - 具体方法 ：一个具体方法由一个抽象类或具体类声明并实现，其子类可以进行覆盖也可以直接继承。(pourOil()、heatOil() 和 fry())
+    - 钩子方法：在抽象类中已经实现，包括用于判断的逻辑方法和需要子类重写的空方法两种。一般钩子方法是用于判断的逻辑方法，这类方法名一般为isXxx，返回值类型为boolean类型。（本例中未出现）
+
+* 具体子类：实现抽象类中所定义的抽象方法和钩子方法，它们是一个顶级逻辑的组成步骤。（CookEggplant 和 CookCabbage）
+
+### 观察者模式
+
+> 又被称为发布-订阅（Publish/Subscribe）模式，它定义了一种一对多的依赖关系，让多个观察者对象同时监听某一个主题对象。这个主题对象在状态变化时，会通知所有的观察者对象，使他们能够自动更新自己。
+
+你有没有想过，当你关注的公众号更新时，为什么你能收到更新提醒消息，你关注的up主更新时，为什么你的能收到动态......其实只要用户订阅了一个主题，这个主题更新时，由主题遍历每一位订阅者，通知他们有消息更新，就实现啦，是不是很简单，直接上代码，主题接口：
+
+```Java
+interface Subject {
+    //增加订阅者
+    void attach(Observer observer);
+
+    //删除订阅者
+    void detach(Observer observer);
+
+    //通知订阅者更新消息
+    void notify(String message);
+}
+```
+
+订阅者接口：
+
+```Java
+interface Observer {
+    void update(String message);
+}
+```
+
+不同的订阅者：
+
+```Java
+class QQUser implements Observer {
+    private String name;
+    
+    public QQUser(String name) {
+        this.name = name;
+    }
+    
+    @Override
+    public void update(String message) {
+        System.out.println("QQ用户" + name + "收到一条信息：" + message);
+    }
+}
+
+class WechatUser implements Observer {
+    private String name;
+    
+    public WechatUser(String name) {
+        this.name = name;
+    }
+    
+    @Override
+    public void update(String message) {
+        System.out.println("微信用户" + name + "收到一条信息：" + message);
+    }
+}
+```
+
+具体主题类：
+
+```Java
+class SubscriptionSubject implements Subject {
+    private List<Observer> observers = new ArrayList<>();
+
+    @Override
+    public void attach(Observer observer) {
+        observers.add(observer);
+    }
+
+    @Override
+    public void detach(Observer observer) {
+        observers.remove(observer);
+    }
+
+    @Override
+    public void notify(String message) {
+        for (Observer observer : observers) {
+            observer.update(message);
+        }
+    }
+}
+```
+
+notify是关键代码，是遍历所有订阅者并给他们发消息，来看客户端：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        SubscriptionSubject subscriptionSubject = new SubscriptionSubject();
+        
+        WechatUser wechatUser = new WechatUser("路人甲");
+        QQUser qqUser = new QQUser("路人乙");
+        
+        subscriptionSubject.attach(wechatUser);
+        subscriptionSubject.attach(qqUser);
+        
+        subscriptionSubject.notify("鸽鸽出新歌了");
+    }
+}
+```
+
+当主题更新时，调用notify方法，就能将消息传给每一位订阅者了。
+
+再回头看观察者模式的定义：
+
+> 又被称为发布-订阅（Publish/Subscribe）模式，它定义了一种一对多的依赖关系，让多个观察者对象同时监听某一个主题对象。这个主题对象在状态变化时，会通知所有的观察者对象，使他们能够自动更新自己。
+
+**说人话**其实就是***我关注你了，你有状态变化别忘记通知所有关注了你的人，这样我就能收到消息了***
+
+我们再回头看观察者模式中出现的角色：
+
+- 抽象主题（抽象被观察者）：抽象主题角色把所有观察者对象保存在一个集合里，每个主题都可以有任意数量的观察者，抽象主题提供一个接口，可以增加和删除观察者对象。（Subject）
+
+- 具体主题（具体被观察者）：该角色将有关状态存入具体观察者对象，在具体主题的内部状态发生改变时，给所有注册过的观察者发送通知。（SubscriptionSubject）
+
+- 抽象观察者：是观察者的抽象类，它定义了一个更新接口，使得在得到主题更改通知时更新自己。（Observer）
+
+- 具体观察者：实现抽象观察者定义的更新接口，以便在得到主题更改通知时更新自身的状态。（QQUser 和 WechatUser）
+
+### 迭代器模式
+
+> 提供一个对象来顺序访问聚合对象中的一系列数据，而不暴露聚合对象的内部表示。 
+
+其实就是遍历嘛，来看迭代器接口：
+
+```Java
+interface Iterator {
+    boolean hasNext();
+    Object next();
+}
+```
+
+是否有下一个，已经获取下一个，两个接口，很简单，现有一个学生类：
+
+```Java
+class Student {
+    private String name;
+    
+    public Student(String name) {
+        this.name = name;
+    }
+}
+```
+
+为方便展示，这里不展示get和set等方法，直接看学生迭代器的实现：
+
+```Java
+class StudentIteratorImpl implements Iterator {
+    private List<Student> list;
+    
+    private int position = 0;
+
+    public StudentIteratorImpl(List<Student> list) {
+        this.list = list;
+    }
+
+    @Override
+    public boolean hasNext() {
+        return position < list.size();
+    }
+
+    @Override
+    public Object next() {
+        Student currentStudent = list.get(position);
+        position++;
+        return currentStudent;
+    }
+}
+```
+
+除此之外，我们应该再来个容器，里面放着学生集合，同时可以获取到学生迭代器遍历集合：
+
+```Java
+interface Aggregate {
+    void add(Object obj);
+
+    void remove(Object obj);
+
+    Iterator getIterator();
+}
+```
+
+具体实现：
+
+```Java
+class StudentAggregateImpl implements Aggregate {
+
+    private List<Student> list = new ArrayList<>();
+
+    @Override
+    public void add(Object obj) {
+        this.list.add((Student) obj);
+    }
+
+    @Override
+    public void remove(Object obj) {
+        this.list.remove((Student) obj);
+    }
+
+    @Override
+    public Iterator getIterator() {
+        return new StudentIteratorImpl(list);
+    }
+}
+```
+
+客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Student student1 = new Student("张三");
+        Student student2 = new Student("李四");
+        Student student3 = new Student("王五");
+        // 获取容器
+        Aggregate aggregate = new StudentAggregateImpl();
+        // 容器中添加对象
+        aggregate.add(student1);
+        aggregate.add(student2);
+        aggregate.add(student3);
+        // 获取迭代器
+        Iterator iterator = aggregate.getIterator();
+        // 迭代器遍历
+        while (iterator.hasNext()) {
+            Student student = (Student) iterator.next();
+            System.out.println(student.getName());
+        }
+    }
+}
+```
+
+我们再回头看迭代器模式的定义：
+
+> 提供一个对象来顺序访问聚合对象中的一系列数据，而不暴露聚合对象的内部表示。 
+
+**说人话**其实就是***定义一套遍历接口***
+
+我们再看迭代器模式中出现的角色：
+
+* 抽象聚合：定义存储、添加、删除聚合元素以及创建迭代器对象的接口。（Aggregate）
+
+* 具体聚合：实现抽象聚合类，返回一个具体迭代器的实例。（StudentAggregateImpl）
+* 抽象迭代器：定义访问和遍历聚合元素的接口，通常包含 hasNext()、next() 等方法。（Iterator）
+* 具体迭代器：实现抽象迭代器接口中所定义的方法，完成对聚合对象的遍历，记录遍历的当前位置。（StudentIteratorImpl）
+
+### 责任链模式
+
+> 又名职责链模式，为了避免请求发送者与多个请求处理者耦合在一起，将所有请求的处理者通过前一对象记住其下一个对象的引用而连成一条链；当有请求发生时，可将请求沿着这条链传递，直到有对象处理它为止。
+
+现需要开发一个请假流程控制系统。请假一天以下的假只需要小组长同意即可；请假1天到3天的假还需要部门经理同意；请求3天到7天还需要总经理同意才行。那我们的流程应该是这样的，先由小组长看假条，小组长能批就直接给你批了，小组长没权限批，就让小组长转交给部门经理，部门经理看他有没有权限，没权限继续往上传。
+
+假条，为方便展示，只展示部分方法：
+
+```Java
+class LeaveRequest {
+    private String name;// 请假人
+    private int num;// 请假天数
+    private String content;// 请假内容
+
+    public LeaveRequest(String name, int num, String content) {
+        this.name = name;
+        this.num = num;
+        this.content = content;
+    }
+}
+```
+
+处理人：
+
+```Java
+abstract class Handler {
+    protected final static int NUM_ONE = 1;
+    protected final static int NUM_THREE = 3;
+    protected final static int NUM_SEVEN = 7;
+	// 能批假天数的范围
+    private int numStart;
+    private int numEnd;
+    // 上级领导，批不了就交给上级来批
+    private Handler nextHandler;
+
+    public Handler(int numStart) {
+        this.numStart = numStart;
+    }
+
+    public Handler(int numStart, int numEnd) {
+        this.numStart = numStart;
+        this.numEnd = numEnd;
+    }
+
+    public void setNextHandler(Handler nextHandler) {
+        this.nextHandler = nextHandler;
+    }
+
+    public final void submit(LeaveRequest leave) {
+    	// 有权限就自己处理了
+        if (leave.getNum() >= this.numStart && leave.getNum() <= this.numEnd || null == nextHandler) {
+            handleLeave(leave);
+        } else {
+        // 没权限就交给上级去批
+            nextHandler.submit(leave);
+        }
+    }
+	// 每位领导批假的方式不太一样，定义为抽象，交给子类具体实现
+    protected abstract void handleLeave(LeaveRequest leave);
+}
+```
+
+小组组长：
+
+```Java
+class GroupLeader extends Handler {
+    public GroupLeader() {
+        super(Handler.NUM_ONE, Handler.NUM_THREE);
+    }
+    
+    @Override
+    protected void handleLeave(LeaveRequest leave) {
+        System.out.println(leave.getName() + "请假" + leave.getNum() + "天," + leave.getContent() + "。");
+        System.out.println("小组长审批：同意。");
+    }
+}
+```
+
+部门经理：
+
+```Java
+class Manager extends Handler {
+    public Manager() {
+        super(Handler.NUM_THREE, Handler.NUM_SEVEN);
+    }
+
+    @Override
+    protected void handleLeave(LeaveRequest leave) {
+        System.out.println(leave.getName() + "请假" + leave.getNum() + "天," + leave.getContent() + "。");
+        System.out.println("部门经理审批：同意。");
+    }
+}
+```
+
+总经理：
+
+```Java
+class GeneralManager extends Handler {
+    public GeneralManager() {
+        super(Handler.NUM_SEVEN);
+    }
+
+    @Override
+    protected void handleLeave(LeaveRequest leave) {
+        System.out.println(leave.getName() + "请假" + leave.getNum() + "天," + leave.getContent() + "。");
+        System.out.println("总经理审批：同意。");
+    }
+}
+```
+
+客户端：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        LeaveRequest leave1 = new LeaveRequest("张三",1,"身体不适");
+        LeaveRequest leave2 = new LeaveRequest("李四",5,"回家种地");
+        LeaveRequest leave3 = new LeaveRequest("王五",9,"家里老母猪生了");
+
+        GroupLeader groupLeader = new GroupLeader();
+        Manager manager = new Manager();
+        GeneralManager generalManager = new GeneralManager();
+        // 设置传递链，小组组长的上级是部门经理，部门经理的上级是总经理
+        groupLeader.setNextHandler(manager);
+        manager.setNextHandler(generalManager);
+        // 不管是什么假条，都先交给小组组长批，小组组长能批就别麻烦上级领导了，领导很忙~
+        groupLeader.submit(leave1);
+        groupLeader.submit(leave2);
+        groupLeader.submit(leave3);
+    }
+}
+```
+
+一般责任链要有个兜底的人，不管什么请求他都能处理，但要放到压轴，小弟能处理就交给小弟处理吧~
+
+我们再回头看责任链模式的定义：
+
+> 又名职责链模式，为了避免请求发送者与多个请求处理者耦合在一起，将所有请求的处理者通过前一对象记住其下一个对象的引用而连成一条链；当有请求发生时，可将请求沿着这条链传递，直到有对象处理它为止。
+
+**说人话**其实就是***你没权限？那你给我转交给有权限的人来处理***
+
+我们再看责任链模式中出现的角色：
+
+- 抽象处理者：定义一个处理请求的接口，包含抽象处理方法和一个后继连接。（Handler）
+
+- 具体处理者：实现抽象处理者的处理方法，判断能否处理本次请求，如果可以处理请求则处理，否则将该请求转给它的后继者。（GroupLeader、Manager 和 GeneralManager）
+
+- 客户类：创建处理链，并向链头的具体处理者对象提交请求，它不关心处理细节和请求的传递过程。（Main）
+
+### 命令模式
+
+> 将一个请求封装为一个对象，使发出请求的责任和执行请求的责任分割开。这样两者之间通过命令对象进行沟通，这样方便将命令对象进行存储、传递、调用、增加与管理。
+
+我们去路边吃烧烤，是直接向师傅说，给我来串烤羊肉，三串淀粉肠，师傅需要边烤边记住每个人需要什么，人一旦多起来，师傅可能会遗漏某一单，或者记错某一单；我们去饭店，一般是找服务员点餐，服务员再通知后台厨师，这样，服务员专心负责传达命令，厨师专心负责做菜，避免了客户与厨师之间的耦合，整个过程井然有序。
+
+厨师既能炒蔬菜，又能炒肉：
+
+```Java
+class Cook {
+    public void cookVegetables(String vegetable) {
+        System.out.println("炒蔬菜：" + vegetable);
+    }
+
+    public void cookMeat(String meat) {
+        System.out.println("炒肉：" + meat);
+    }
+}
+```
+
+抽象命令类：
+
+```Java
+abstract class Command {
+    // 厨子，也就是命令的接收者
+    protected Cook receiver;
+    
+    protected String information;
+    
+    public Command(Cook receiver, String information) {
+        this.receiver = receiver;
+        this.information = information;
+    }
+    // 不同命令的执行是不同的，蔬菜命令需要厨子执行炒蔬菜的方法，肉命令需要厨子执行炒肉的方法
+    abstract public void executeCommand();
+}
+```
+
+具体命令：
+
+```Java
+class VegetablesCommand extends Command{
+    public VegetablesCommand(Cook receiver, String information) {
+        super(receiver, information);
+    }
+
+    @Override
+    public void executeCommand() {
+        // 让命令接收者执行特点的方法
+        receiver.cookVegetables(information);
+    }
+}
+
+class MeatCommand extends Command{
+    public MeatCommand(Cook receiver, String information) {
+        super(receiver, information);
+    }
+
+    @Override
+    public void executeCommand() {
+        // 让命令接收者执行特点的方法
+        receiver.cookMeat(information);
+    }
+}
+```
+
+服务员类：
+
+```Java
+class Waiter {
+    private List<Command> orders = new ArrayList<>();
+    // 新增命令
+    public void addOrder(Command command) {
+        orders.add(command);
+        System.out.println("新增订单：" + command.information);
+    }
+    // 移除命令
+    public void cancelOrder(Command command) {
+        orders.remove(command);
+        System.out.println("取消订单：" + command.information);
+    }
+    // 遍历每个命令，让命令执行
+    public void executeOrders() {
+        for (Command command : orders) {
+            command.executeCommand();
+        }
+    }
+}
+```
+
+客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Cook cook = new Cook();
+        Command command1 = new MeatCommand(cook, "辣椒炒肉");
+        Command command2 = new MeatCommand(cook, "肉沫茄子");
+        Command command3 = new VegetablesCommand(cook, "耗油花菜");
+        Command command4 = new VegetablesCommand(cook, "农家青菜");
+        Waiter waiter = new Waiter();
+        
+        waiter.addOrder(command1);
+        waiter.addOrder(command2);
+        waiter.addOrder(command3);
+        waiter.addOrder(command4);
+        
+        waiter.cancelOrder(command2);
+        
+        waiter.executeOrders();
+    }
+}
+```
+
+我们再回头看命令模式的定义：
+
+> 将一个请求封装为一个对象，使发出请求的责任和执行请求的责任分割开。这样两者之间通过命令对象进行沟通，这样方便将命令对象进行存储、传递、调用、增加与管理。
+
+**说人话**其实就是***waiter~点餐！***
+
+我们再看命令模式中出现的角色：
+
+- 抽象命令类： 定义命令的接口，声明执行的方法。（Command）
+
+- 具体命令：具体的命令，实现命令接口；通常会持有接收者，并调用接收者的功能来完成命令要执行的操作。（MeatCommand 和 VegetablesCommand）
+
+- 实现者/接收者： 接收者，真正执行命令的对象。任何类都可能成为一个接收者，只要它能够实现命令要求实现的相应功能。（Cook）
+
+- 调用者/请求者（Invoker）角色： 要求命令对象执行请求，通常会持有命令对象，可以持有很多的命令对象。这个是客户端真正触发命令并要求命令执行相应操作的地方，也就是说相当于使用命令对象的入口。（Waiter）
+
+### 备忘录模式
+
+> 又叫快照模式，在不破坏封装性的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态，以便以后当需要时能将该对象恢复到原先保存的状态。
+>
+
+其实就是**存档**，就是保存一个对象的当前状态，随时可以恢复，windows里的ctrl+z就是这个
+
+先来备忘录接口，接口内方法为空，只起到声明的作用，详情我们稍后在讲：
+
+```Java
+interface IMemento {
+}
+```
+
+备忘录发起者，也就是需要存档的对象，省略了get和set方法：
+
+```Java
+class Originator {
+    private String state;
+
+    public Memento saveToMemento() {
+        return new Memento(state);
+    }
+
+    public void getStateFromMemento(IMemento memento) {
+        state = ((Memento) memento).getState();
+    }
+
+}
+```
+
+里面有两个方法，存档和读档，是从备忘录类读取的，来看备忘录类：
+
+```Java
+class Memento implements IMemento {
+    private String state;
+
+    public Memento(String state) {
+        this.state = state;
+    }
+
+    public String getState() {
+        return state;
+    }
+}
+```
+
+实现备忘录接口IMemento，其实就相当于被声明为IMemento的子类，然后有需要被存档的成员变量以及获取方法，这里不应该提供set方法，因为一个存档被创建后就不应该被修改，应该是只读的。
+
+除此之外，我们应该还有个管理者帮助我们进行存档和读档操作：
+
+```Java
+/**
+ * 管理者只能看到窄接口，不允许修改备忘录对象
+ */
+class Caretaker {
+
+    private List<IMemento> mementoList = new ArrayList<>();
+
+    public void add(IMemento memento) {
+        mementoList.add(memento);
+    }
+
+    public IMemento get(int index) {
+        if (index >= mementoList.size()) return null;
+        return mementoList.get(index);
+    }
+
+}
+```
+
+管理者有个mementoList，也就是所有存档集合，然后有添加存档和获取存档的方法，但添加和获取存档的对象都是IMemento接口对象，而这是个空接口，对于管理者来说，这就是个**窄接口**，只能传递，不能访问，也就是说**管理者只能帮助管理，不能访问存档**，仔细体悟这里多态的精髓吧~
+
+再回头看备忘录发起者中读档的方法：
+
+```Java
+public void getStateFromMemento(IMemento memento) {
+	state = ((Memento) memento).getState();
+}
+```
+
+同样是接收IMemento接口，但他可以将这个接口**向下转型**成Memento对象，然后获取里面的数据，所以这个接口对于备忘录发起者来说是**宽接口**
+
+客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        // 获取存档管理者
+        Caretaker caretaker = new Caretaker();
+        // 获取备忘录发起者
+        Originator originator = new Originator();
+        // 设置状态
+        originator.setState("State 1");
+        // 存档
+        caretaker.add(originator.saveToMemento());
+        // 设置状态
+        originator.setState("State 2");
+        // 存档
+        caretaker.add(originator.saveToMemento());
+        // 设置状态
+        originator.setState("State 3");
+        // 读档
+        originator.getStateFromMemento(caretaker.get(0));
+        // 查看当前状态
+        System.out.println(originator.getState());
+        // 再读档
+        originator.getStateFromMemento(caretaker.get(1));
+        // 查看当前状态
+        System.out.println(originator.getState());
+    }
+}
+```
+
+我们再回头看备忘录模式的定义：
+
+> 又叫快照模式，在不破坏封装性的前提下，捕获一个对象的内部状态，并在该对象之外保存这个状态，以便以后当需要时能将该对象恢复到原先保存的状态。
+
+**说人话**其实就是***存档！***
+
+我们再看备忘录模式中出现的角色：
+
+- 发起人：记录当前时刻的内部状态信息，提供创建备忘录和恢复备忘录数据的功能，实现其他业务功能，它可以访问备忘录里的所有信息。（Originator）
+
+- 备忘录：负责存储发起人的内部状态，在需要的时候提供这些内部状态给发起人。（Memento）
+
+- 管理者：对备忘录进行管理，提供保存与获取备忘录的功能，但其不能对备忘录的内容进行访问与修改。（Caretaker）
+
+### 状态模式
+
+> 对有状态的对象，把复杂的“判断逻辑”提取到不同的状态对象中，允许状态对象在其内部状态发生改变时改变其行为。
+
+一个电梯有开门状态，关门状态，停止状态，运行状态（虽然运行和关门状态实际上是同时存在的，但我们这里假设两者只能同时存在其中之一）。每一种状态改变，都有可能要根据其他状态来更新处理。例如，如果电梯门现在处于运行时状态，就不能进行开门操作，而如果电梯门是停止状态，就可以执行开门操作。
+
+如果按照平时的写法， 难免有大量的switch判断。根据当前状态，转移到其余状态的转移方程有4 * 4 = 16种（自己转移到自己也需要进行判断）。如果这些东西都写到一个类中未免显得过于臃肿，而且扩展性较低。那不妨将状态抽象出来，每个状态都是一个状态类，然后由一个电梯（Context）进行状态切换操作，但具体的切换逻辑还是由每个状态自己负责，先看抽象出来的状态类：
+
+```Java
+abstract class LiftState {
+    protected Context context;
+    
+    public void setContext(Context context) {
+        this.context = context;
+    }
+    
+    public abstract void open();
+
+    public abstract void close();
+
+    public abstract void run();
+
+    public abstract void stop();
+}
+```
+
+这个类表示，我这个状态属于一个具体的电梯（Context）（废话，脱离了电梯还扯什么电梯状态），然后在当前状态下，可以进行开，关，运行，停止这四种状态的切换。先看开启状态：
+
+```Java
+class OpeningState extends LiftState {
+    @Override
+    public void open() {
+        System.out.println("电梯已处于开启状态...");
+    }
+
+    @Override
+    public void close() {
+        System.out.println("电梯关闭...");
+        context.setLiftState(Context.closingState);
+    }
+
+    @Override
+    public void run() {
+        System.out.println("电梯处于开启状态，无法运行");
+    }
+
+    @Override
+    public void stop() {
+        System.out.println("电梯处于开启状态，不需要停止");
+    }
+}
+```
+
+开启状态下切换成开启状态，这不是脱裤子放屁吗；开启状态下切换成关闭状态，这自然是允许的，执行对应的逻辑后（这里是控制台打印）将电梯（context）的状态设置为关闭状态；开启状态下切换成允许状态，除非你不要命啦，不予切换；开启状态下切换成停止状态，按现实来说开启状态下已经是停止状态了，但这里因为场景需要，我们假设不能直接切换。
+
+同理分析其余三种状态：
+
+```Java
+// 关闭状态
+class ClosingState extends LiftState {
+    @Override
+    public void close() {
+        System.out.println("电梯已处于关闭状态...");
+    }
+
+    @Override
+    public void open() {
+        System.out.println("电梯开启...");
+        super.context.setLiftState(Context.openingState);
+    }
+
+    @Override
+    public void run() {
+        System.out.println("电梯运行...");
+        super.context.setLiftState(Context.runningState);
+    }
+
+    @Override
+    public void stop() {
+        System.out.println("电梯停止...");
+        super.context.setLiftState(Context.stoppingState);
+    }
+}
+// 运行状态
+class RunningState extends LiftState {
+
+    @Override
+    public void open() {
+        System.out.println("电梯处于运行状态，无法开启");
+    }
+
+    @Override
+    public void close() {
+        System.out.println("电梯处于运行状态，不需要关闭");
+    }
+
+    @Override
+    public void run() {
+        System.out.println("电梯已处于运行状态...");
+    }
+
+    @Override
+    public void stop() {
+        System.out.println("电梯停止...");
+        super.context.setLiftState(Context.stoppingState);
+    }
+}
+// 停止状态
+class StoppingState extends LiftState {
+    @Override
+    public void open() {
+        System.out.println("电梯开启...");
+        super.context.setLiftState(Context.openingState);
+    }
+
+    @Override
+    public void close() {
+        System.out.println("电梯关闭...");
+        super.context.setLiftState(Context.closingState);
+    }
+
+    @Override
+    public void run() {
+        System.out.println("电梯运行...");
+        super.context.setLiftState(Context.runningState);
+    }
+
+    @Override
+    public void stop() {
+        System.out.println("电梯已处于停止状态...");
+    }
+}
+```
+
+再来看看我们的电梯，也就是Context：
+
+```Java
+class Context {
+    // 将状态设置为静态常量，方便切换
+    public final static OpeningState openingState = new OpeningState();
+    public final static ClosingState closingState = new ClosingState();
+    public final static RunningState runningState = new RunningState();
+    public final static StoppingState stoppingState = new StoppingState();
+    
+    // 当前电梯状态
+    private LiftState liftState;
+
+    // 设置电梯状态，切换电梯状态的同时让电梯状态知道它是属于哪个电梯的，电梯和电梯状态是相互聚合，你中有我，我中有你的
+    public void setLiftState(LiftState liftState) {
+        this.liftState = liftState;
+        this.liftState.setContext(this);
+    }
+    // 当前电梯需要开启
+    public void open() {
+        liftState.open();
+    }
+    // 当前电梯需要关闭
+    public void close() {
+        liftState.close();
+    }
+    // 当前电梯需要运行
+    public void run() {
+        liftState.run();
+    }
+    // 当前电梯需要停止
+    public void stop() {
+        liftState.stop();
+    }
+}
+```
+
+这样，电梯状态的切换具体判断逻辑就由每个状态自己负责了，电梯（Context）的职责就显得十分清爽。
+
+客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Context context = new Context();
+        // 默认初始停止状态
+        context.setLiftState(new ClosingState());
+        context.stop();
+        context.open();
+        context.run();
+        context.close();
+        context.run();
+        context.open();
+        context.close();
+        context.run();
+        context.stop();
+    }
+}
+```
+
+电梯只管切换，整个代码中没有出现switch语句。
+
+我们再回头看状态模式的定义：
+
+> 对有状态的对象，把复杂的“判断逻辑”提取到不同的状态对象中，允许状态对象在其内部状态发生改变时改变其行为。
+
+**说人话**其实就是***每个状态都是独立的，并且每个状态自己负责转移到其它状态的逻辑***
+
+我们再看状态模式中出现的角色：
+
+- 环境：也称为上下文，它定义了客户程序需要的接口，维护一个当前状态，并将与状态相关的操作委托给当前状态对象来处理。（Context）
+
+- 抽象状态：定义一个接口，用以封装环境对象中的特定状态所对应的行为。（LiftState）
+
+- 具体状态：实现抽象状态所对应的行为。（OpeningState、ClosingState、RunningState 和 StoppingState）
+
+### 访问者模式
+
+> 封装一些作用于某种数据结构中的各元素的操作，它可以在不改变这个数据结构的前提下定义作用于这些元素的新的操作。
+
+在主人的家中，有猫有狗，人可以给这些宠物喂食，人又分为主人和其他人，也就是不同访问者，不同访问者喂同样的猫猫狗狗得到的反应是不一样的。
+
+先来看人接口：
+
+```Java
+interface Person {
+    void feedCat(Cat cat);
+
+    void feedDog(Dog dog);
+}
+```
+
+可以喂猫喂狗，没什么毛病，再来看动物类接口：
+
+```Java
+interface Animal {
+    void accept(Person person);
+}
+```
+
+可以接收人的投喂，没什么毛病，再来看人的具体实现：
+
+```java
+class Owner implements Person {
+    @Override
+    public void feedCat(Cat cat) {
+        System.out.println("主人喂猫，并说了声，我家猫可爱吧");
+    }
+
+    @Override
+    public void feedDog(Dog dog) {
+        System.out.println("主人喂狗，并说了声，我家狗可爱吧");
+    }
+}
+
+class Someone implements Person {
+    @Override
+    public void feedCat(Cat cat) {
+        System.out.println("其他人喂猫，夸了句，你家猫真听话");
+    }
+
+    @Override
+    public void feedDog(Dog dog) {
+        System.out.println("其他人喂狗，夸了句，你家狗好活泼");
+    }
+}
+```
+
+人分为主人和其他人，两者方法的执行逻辑是不一样的，来看动物的具体实现：
+
+```Java
+class Cat implements Animal {
+    @Override
+    public void accept(Person person) {
+        person.feedCat(this);
+        System.out.println("好好吃，喵喵喵！！！");
+    }
+}
+
+class Dog implements Animal {
+    @Override
+    public void accept(Person person) {
+        person.feedDog(this);
+        System.out.println("好好吃，汪汪汪！！！");
+    }
+}
+```
+
+接收人的投喂，并调用人的投喂方法，把自己传递进去（你拿个猫条在猫面前，猫就向你主动求食，求投喂了），再来看主人的家吧：
+
+```Java
+class Home {
+    // 家里有许多动物，虽然是不同的，但都有个共同接口，照收不误
+    private List<Animal> animals = new ArrayList<>();
+
+    // 当前访问者对每个节点进行访问，也就是把每个动物投喂一遍
+    public void action(Person person) {
+        for (Animal animal : animals) {
+            animal.accept(person);
+        }
+    }
+
+    public void add(Animal animal) {
+        animals.add(animal);
+    }
+}
+```
+
+来看客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        // 准备数据
+        Home home = new Home();
+        home.add(new Dog());
+        home.add(new Cat());
+        // 主人投喂
+        Owner owner = new Owner();
+        home.action(owner);
+        // 其他人投喂
+        Someone someone = new Someone();
+        home.action(someone);
+    }
+}
+```
+
+不同人投喂（不同访问者访问）同一个屋子里的猫和狗（同样的被访问者），得到的反应是不一样的，具体的不一样逻辑是在人的投喂方法（访问者的方法实现）中。
+
+我们再回头看访问者模式的定义：
+
+>封装一些作用于某种数据结构中的各元素的操作，它可以在不改变这个数据结构的前提下定义作用于这些元素的新的操作。
+
+**说人话**其实就是***不同访问者访问相同对象，得到的反应是不一样的***
+
+我们再看访问者模式中出现的角色：
+
+- 抽象访问者：定义了对每一个元素访问的行为，它的参数就是可以访问的元素，它的方法个数理论上来讲与元素类个数是一样的（有几种动物就有几种投喂方式），从这点不难看出，访问者模式要求元素类的个数不能改变。（Person）
+
+- 具体访问者：给出对每一个元素类访问时所产生的具体行为。（Owner和Someone）
+
+- 抽象元素：定义了一个接受访问者的方法，其意义是指，每一个元素都要可以被访问者访问。（Animal）
+
+- 具体元素： 提供接受访问方法的具体实现，而这个具体的实现，通常情况下是使用访问者提供的访问该元素类的方法。（Dog和Cat）
+
+- 对象结构：定义当中所提到的对象结构，对象结构是一个抽象表述，具体点可以理解为一个具有容器性质或者复合对象特性的类，它会含有一组元素，并且可以迭代这些元素，供访问者访问。（Home）
+
+### 中介者模式
+
+> 又叫调停模式，定义一个中介角色来封装一系列对象之间的交互，使原有对象之间的耦合松散，且可以独立地改变它们之间的交互。
+
+以前打电话的话是需要先打给邮电局的总机的，然后”诶，你好，帮我转接一下张三“。这里的接线员就是起到了中介的作用，所有人只需要知道中介的联系方式，然后要和谁联系让中介帮忙联系就行；但中介却需要认识所有人，以便转发消息。
+
+来看中介者接口：
+
+```Java
+interface Mediator {
+    void register(Colleague colleague); // 客户注册
+
+    void relay(String from, String to,String ad); // 转发
+}
+```
+
+抽象同事类（用户）：
+
+```Java
+abstract class Colleague {
+    protected Mediator mediator;
+    
+    protected String name;
+    
+    public Colleague(String name) {
+        this.name = name;
+    }
+    
+    public void setMedium(Mediator mediator) {
+        this.mediator = mediator;
+    }
+    
+    public abstract void send(String to, String ad);
+    
+    public abstract void receive(String from, String ad);
+}
+```
+
+同事类需要认识中介，故内聚一个中介者对象，同时要有发消息和接收消息的方法，来看具体实现：
+
+```Java
+class ConcreteColleague extends Colleague{
+    public ConcreteColleague(String name) {
+        super(name);
+    }
+
+    @Override
+    public void send(String to, String ad) {
+        mediator.relay(name, to, ad);
+    }
+
+    @Override
+    public void receive(String from, String ad) {
+        System.out.println(name + "接收到来自" + from + "的消息:" + ad);
+    }
+}
+```
+
+发消息直接调用中介者的方法转发消息即可，接收消息直接接收即可（接收消息方法一般由中介者调用，中介来联系通知所有人），来看中介者的实现：
+
+```Java
+class ConcreteMediator implements Mediator {
+    private List<Colleague> colleagues = new ArrayList<>();
+    
+    @Override
+    public void register(Colleague colleague) {
+        if (!colleagues.contains(colleague)) {
+            colleagues.add(colleague);
+            colleague.setMedium(this);
+        }
+    }
+    
+    @Override
+    public void relay(String from, String to, String ad) {
+        for (Colleague cl : colleagues) {
+            String name = cl.getName();
+            if (name.equals(to)) {
+                cl.receive(from, ad);
+            }
+        }
+    }
+}
+```
+
+中介需要认识所有用户，用集合存储，新增用户直接往集合中添加用户，同时告诉用户，我是你的中介，以后你要给谁发消息找我就行；转发消息则遍历所有用户，找到目标用户，给他发消息，并告诉他是谁给他发的消息。根据实际场景，可以将集合换成Map或其它集合。
+
+客户端代码：
+
+```Java
+class Main {
+    public static void main(String[] args) {
+        Mediator mediator = new ConcreteMediator();
+        Colleague colleague1 = new ConcreteColleague("张三");
+        Colleague colleague2 = new ConcreteColleague("李四");
+        Colleague colleague3 = new ConcreteColleague("王五");
+        mediator.register(colleague1);
+        mediator.register(colleague2);
+        mediator.register(colleague3);
+
+        colleague1.send("李四", "晚上出来吃饭，叫上王五");
+        colleague2.send("王五", "张三叫咱一起吃饭");
+        colleague3.send("张三", "李四和我说了，老地方见");
+    }
+}
+```
+
+我们再回头看中介者模式的定义：
+
+> 又叫调停模式，定义一个中介角色来封装一系列对象之间的交互，使原有对象之间的耦合松散，且可以独立地改变它们之间的交互。
+
+**说人话**其实就是***找个中介解除同事之间的耦合***
+
+我们再看中介者模式中出现的角色：
+
+- 抽象中介者：它是中介者的接口，提供了同事对象注册与转发同事对象信息的抽象方法。（Mediator）
+
+- 具体中介者：实现中介者接口，定义一个 List 来管理同事对象，协调各个同事角色之间的交互关系，因此它依赖于同事角色。（ConcreteMediator）
+
+- 抽象同事类：定义同事类的接口，保存中介者对象，提供同事对象交互的抽象方法，实现所有相互影响的同事类的公共功能。（Colleague）
+
+- 具体同事类：是抽象同事类的实现者，当需要与其他同事对象交互时，由中介者对象负责后续的交互。（ConcreteColleague）
+
+### 解释器模式
+
+> 给定一个语言，定义它的文法表示，并定义一个解释器，这个解释器使用该标识来解释语言中的句子。
+

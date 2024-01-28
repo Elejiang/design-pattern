@@ -6,7 +6,7 @@ import java.util.List;
 /**
  * 管理者只能看到窄接口，不允许修改备忘录对象
  */
-class CareTaker {
+class Caretaker {
 
     private List<IMemento> mementoList = new ArrayList<>();
 
